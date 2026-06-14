@@ -1,0 +1,30 @@
+# ============================================================
+# Grafana Dashboard Provisioning
+# ============================================================
+# This file defines the dashboard provider that loads JSON
+# dashboard files from the mounted volume at container startup.
+#
+# Dashboard JSON files are stored at:
+#   Host:      ./monitoring/grafana/dashboards/
+#   Container: /var/lib/grafana/dashboards (mounted as read-only)
+#
+# Available dashboards:
+#   - server-overview.json      (Login/Char/Map/DB status)
+#   - database-performance.json (QPS, connections, buffer, slow queries)
+#   - host-resources.json       (CPU, RAM, disk, network - 1min granularity)
+# ============================================================
+
+apiVersion: 1
+
+providers:
+  - name: rAthena Dashboards
+    orgId: 1
+    folder: ""
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

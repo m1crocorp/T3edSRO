@@ -1,0 +1,21 @@
+[mysqld]
+# Performance
+innodb_buffer_pool_size = 1024M
+innodb_log_file_size = 256M
+innodb_flush_log_at_trx_commit = 2
+max_connections = 151
+
+# Charset
+character-set-server = utf8mb4
+collation-server = utf8mb4_general_ci
+
+# Logging
+log-bin = mysql-bin
+expire_logs_days = 7
+slow_query_log = 1
+long_query_time = 2
+slow_query_log_file = /var/lib/mysql/slow-query.log
+
+# Security
+skip-name-resolve
+bind-address = 0.0.0.0

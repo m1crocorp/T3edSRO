@@ -1,0 +1,44 @@
+// rAthena Char Server Configuration Template
+// Processed by envsubst at container startup
+// Output: /rathena/conf/generated/char_athena.conf
+
+// Char Server Network Settings
+char_port: ${CHAR_SERVER_PORT}
+
+// Bind address
+bind_ip: ${CHAR_BIND_IP}
+
+// Server name displayed in client server list
+server_name: ${SERVER_NAME}
+
+// Login Server connection (inter-server communication)
+login_ip: ${LOGIN_SERVER_IP}
+login_port: ${LOGIN_SERVER_PORT}
+
+// WAN IP shown to players connecting from outside
+char_ip: ${SERVER_PUBLIC_IP}
+
+// Timestamp format in logs
+timestamp_format: ${LOG_TIMESTAMP_FORMAT}
+
+// Console output
+stdout_with_ansisequence: no
+console_silent: 0
+
+// Character settings
+start_point: ${CHAR_START_POINT}
+start_zeny: ${CHAR_START_ZENY}
+
+// Character creation limits
+chars_per_account: ${CHAR_PER_ACCOUNT}
+char_del_delay: ${CHAR_DEL_DELAY}
+
+// Name restrictions
+char_name_letters: ${CHAR_NAME_LETTERS}
+char_name_option: ${CHAR_NAME_OPTION}
+
+// Guild settings
+max_guild_alliance: 3
+
+// Pincode system
+pincode_enabled: ${CHAR_PINCODE_ENABLED}

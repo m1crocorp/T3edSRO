@@ -1,0 +1,1225 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<zabbix_export>
+    <version>7.0</version>
+    <date>2025-01-01T00:00:00Z</date>
+    <template_groups>
+        <template_group>
+            <uuid>a571c0d144b14fd4a87a9d9b2aa9fcd6</uuid>
+            <name>Templates/rAthena</name>
+        </template_group>
+    </template_groups>
+    <host_groups>
+        <host_group>
+            <uuid>b8e9c2f1a3d74e5f8c1b2a3d4e5f6a7b</uuid>
+            <name>rAthena Servers</name>
+        </host_group>
+        <host_group>
+            <uuid>c9f0d3e2b4a85f6e7d2c3b4a5f6e7d8c</uuid>
+            <name>rAthena Infrastructure</name>
+        </host_group>
+    </host_groups>
+    <templates>
+        <!-- =======================================================
+             Template: rAthena Services Monitoring
+             Monitors TCP port availability, host resources, MariaDB
+             metrics, and backup status with alerting.
+             Requirements: 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 5.10
+             ======================================================= -->
+        <template>
+            <uuid>d1a2b3c4e5f67890abcdef1234567890</uuid>
+            <template>rAthena Services</template>
+            <name>rAthena Services Monitoring</name>
+            <description>Comprehensive monitoring for rAthena game server infrastructure.&#13;
+Includes: TCP service checks (Login/Char/Map), host resources (CPU/memory/disk/network) via Agent2, MariaDB metrics (connections/QPS/slow queries/buffer pool), and backup status.&#13;
+Triggers with severity-based alerting and webhook notifications.&#13;
+&#13;
+Importable via: Configuration → Templates → Import (Zabbix 7.0 LTS)&#13;
+&#13;
+Requirements covered: 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 5.10</description>
+            <groups>
+                <group>
+                    <name>Templates/rAthena</name>
+                </group>
+            </groups>
+            <macros>
+                <!-- rAthena Service Ports -->
+                <macro>
+                    <macro>{$RATHENA.LOGIN.PORT}</macro>
+                    <value>6900</value>
+                    <description>Login Server TCP port</description>
+                </macro>
+                <macro>
+                    <macro>{$RATHENA.CHAR.PORT}</macro>
+                    <value>6121</value>
+                    <description>Char Server TCP port</description>
+                </macro>
+                <macro>
+                    <macro>{$RATHENA.MAP.PORT}</macro>
+                    <value>5121</value>
+                    <description>Map Server TCP port</description>
+                </macro>
+                <macro>
+                    <macro>{$RATHENA.HOST}</macro>
+                    <value>localhost</value>
+                    <description>Host where rAthena services are running</description>
+                </macro>
+                <!-- Alert Thresholds -->
+                <macro>
+                    <macro>{$CPU.THRESHOLD.HIGH}</macro>
+                    <value>80</value>
+                    <description>CPU utilization threshold for High severity alert (%)</description>
+                </macro>
+                <macro>
+                    <macro>{$MEMORY.THRESHOLD.HIGH}</macro>
+                    <value>85</value>
+                    <description>Memory utilization threshold for High severity alert (%)</description>
+                </macro>
+                <macro>
+                    <macro>{$DISK.THRESHOLD.DISASTER}</macro>
+                    <value>10</value>
+                    <description>Free disk space threshold for Disaster severity alert (%)</description>
+                </macro>
+                <macro>
+                    <macro>{$TCP.FAIL.DURATION}</macro>
+                    <value>30s</value>
+                    <description>Duration of TCP failure before Disaster alert</description>
+                </macro>
+                <macro>
+                    <macro>{$SLOW.QUERIES.THRESHOLD}</macro>
+                    <value>10</value>
+                    <description>Slow queries per minute threshold for Warning alert</description>
+                </macro>
+                <!-- MariaDB Connection -->
+                <macro>
+                    <macro>{$MYSQL.HOST}</macro>
+                    <value>localhost</value>
+                    <description>MariaDB host for monitoring</description>
+                </macro>
+                <macro>
+                    <macro>{$MYSQL.PORT}</macro>
+                    <value>3306</value>
+                    <description>MariaDB port</description>
+                </macro>
+                <macro>
+                    <macro>{$MYSQL.USER}</macro>
+                    <value>zabbix</value>
+                    <description>MariaDB monitoring user</description>
+                </macro>
+                <macro>
+                    <macro>{$MYSQL.PASSWORD}</macro>
+                    <value></value>
+                    <description>MariaDB monitoring user password</description>
+                    <type>SECRET_TEXT</type>
+                </macro>
+                <!-- Webhook Notification -->
+                <macro>
+                    <macro>{$ALERT.WEBHOOK.URL}</macro>
+                    <value></value>
+                    <description>Webhook URL for notifications (Discord/Telegram/Slack)</description>
+                </macro>
+                <macro>
+                    <macro>{$ALERT.WEBHOOK.TYPE}</macro>
+                    <value>discord</value>
+                    <description>Webhook type: discord, telegram, or slack</description>
+                </macro>
+            </macros>
+            <items>
+                <!-- =======================================================
+                     TCP Port Checks: rAthena Services (net.tcp.port)
+                     Requirement: 5.3
+                     ======================================================= -->
+                <!-- TCP Port Check: Login Server (6900) -->
+                <item>
+                    <uuid>e2b3c4d5f6a78901bcdef23456789012</uuid>
+                    <name>rAthena Login Server: TCP port {$RATHENA.LOGIN.PORT} status</name>
+                    <type>SIMPLE</type>
+                    <key>net.tcp.port[{$RATHENA.HOST},{$RATHENA.LOGIN.PORT}]</key>
+                    <delay>10s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <description>Checks TCP connectivity to Login Server port. Returns 1 if service is up, 0 if down.</description>
+                    <tags>
+                        <tag>
+                            <tag>service</tag>
+                            <value>login-server</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>rathena</value>
+                        </tag>
+                    </tags>
+                </item>
+                <!-- TCP Port Check: Char Server (6121) -->
+                <item>
+                    <uuid>f3c4d5e6a7b89012cdef34567890abcd</uuid>
+                    <name>rAthena Char Server: TCP port {$RATHENA.CHAR.PORT} status</name>
+                    <type>SIMPLE</type>
+                    <key>net.tcp.port[{$RATHENA.HOST},{$RATHENA.CHAR.PORT}]</key>
+                    <delay>10s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <description>Checks TCP connectivity to Char Server port. Returns 1 if service is up, 0 if down.</description>
+                    <tags>
+                        <tag>
+                            <tag>service</tag>
+                            <value>char-server</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>rathena</value>
+                        </tag>
+                    </tags>
+                </item>
+                <!-- TCP Port Check: Map Server (5121) -->
+                <item>
+                    <uuid>a4d5e6f7b8c90123def456789012bcde</uuid>
+                    <name>rAthena Map Server: TCP port {$RATHENA.MAP.PORT} status</name>
+                    <type>SIMPLE</type>
+                    <key>net.tcp.port[{$RATHENA.HOST},{$RATHENA.MAP.PORT}]</key>
+                    <delay>10s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <description>Checks TCP connectivity to Map Server port. Returns 1 if service is up, 0 if down.</description>
+                    <tags>
+                        <tag>
+                            <tag>service</tag>
+                            <value>map-server</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>rathena</value>
+                        </tag>
+                    </tags>
+                </item>
+                <!-- TCP Response Time: Login Server -->
+                <item>
+                    <uuid>b5e6f7a8c9d01234ef5678901234cdef</uuid>
+                    <name>rAthena Login Server: TCP port {$RATHENA.LOGIN.PORT} response time</name>
+                    <type>SIMPLE</type>
+                    <key>net.tcp.service.perf[tcp,{$RATHENA.HOST},{$RATHENA.LOGIN.PORT}]</key>
+                    <delay>10s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>FLOAT</value_type>
+                    <units>s</units>
+                    <description>TCP response time for Login Server port in seconds.</description>
+                    <tags>
+                        <tag>
+                            <tag>service</tag>
+                            <value>login-server</value>
+                        </tag>
+                    </tags>
+                </item>
+                <!-- TCP Response Time: Char Server -->
+                <item>
+                    <uuid>c6f7a8b9d0e12345f67890123456defa</uuid>
+                    <name>rAthena Char Server: TCP port {$RATHENA.CHAR.PORT} response time</name>
+                    <type>SIMPLE</type>
+                    <key>net.tcp.service.perf[tcp,{$RATHENA.HOST},{$RATHENA.CHAR.PORT}]</key>
+                    <delay>10s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>FLOAT</value_type>
+                    <units>s</units>
+                    <description>TCP response time for Char Server port in seconds.</description>
+                    <tags>
+                        <tag>
+                            <tag>service</tag>
+                            <value>char-server</value>
+                        </tag>
+                    </tags>
+                </item>
+                <!-- TCP Response Time: Map Server -->
+                <item>
+                    <uuid>d7a8b9c0e1f23456a789012345670bcd</uuid>
+                    <name>rAthena Map Server: TCP port {$RATHENA.MAP.PORT} response time</name>
+                    <type>SIMPLE</type>
+                    <key>net.tcp.service.perf[tcp,{$RATHENA.HOST},{$RATHENA.MAP.PORT}]</key>
+                    <delay>10s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>FLOAT</value_type>
+                    <units>s</units>
+                    <description>TCP response time for Map Server port in seconds.</description>
+                    <tags>
+                        <tag>
+                            <tag>service</tag>
+                            <value>map-server</value>
+                        </tag>
+                    </tags>
+                </item>
+                <!-- =======================================================
+                     Host Resource Metrics via Zabbix Agent2
+                     Requirement: 5.2
+                     ======================================================= -->
+                <!-- CPU Metrics -->
+                <item>
+                    <uuid>11a2b3c4d5e6f7890a1b2c3d4e5f6a01</uuid>
+                    <name>Host: CPU utilization</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>system.cpu.util</key>
+                    <delay>60s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>Total CPU utilization percentage via Zabbix Agent2.</description>
+                    <tags>
+                        <tag>
+                            <tag>resource</tag>
+                            <value>cpu</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>host</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>12a2b3c4d5e6f7890a1b2c3d4e5f6a02</uuid>
+                    <name>Host: CPU idle time</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>system.cpu.util[,idle]</key>
+                    <delay>60s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>CPU idle time percentage. Used for trigger calculation (100 - idle = utilization).</description>
+                    <tags>
+                        <tag>
+                            <tag>resource</tag>
+                            <value>cpu</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>host</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>13a2b3c4d5e6f7890a1b2c3d4e5f6a03</uuid>
+                    <name>Host: CPU system time</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>system.cpu.util[,system]</key>
+                    <delay>60s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>CPU time spent in kernel space.</description>
+                    <tags>
+                        <tag>
+                            <tag>resource</tag>
+                            <value>cpu</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>host</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>14a2b3c4d5e6f7890a1b2c3d4e5f6a04</uuid>
+                    <name>Host: CPU user time</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>system.cpu.util[,user]</key>
+                    <delay>60s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>CPU time spent in user space.</description>
+                    <tags>
+                        <tag>
+                            <tag>resource</tag>
+                            <value>cpu</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>host</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>15a2b3c4d5e6f7890a1b2c3d4e5f6a05</uuid>
+                    <name>Host: CPU I/O wait time</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>system.cpu.util[,iowait]</key>
+                    <delay>60s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>CPU time waiting for I/O operations.</description>
+                    <tags>
+                        <tag>
+                            <tag>resource</tag>
+                            <value>cpu</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>host</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>16a2b3c4d5e6f7890a1b2c3d4e5f6a06</uuid>
+                    <name>Host: Load average (1 min)</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>system.cpu.load[all,avg1]</key>
+                    <delay>60s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>FLOAT</value_type>
+                    <description>System load average over the last 1 minute.</description>
+                    <tags>
+                        <tag>
+                            <tag>resource</tag>
+                            <value>cpu</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>host</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>17a2b3c4d5e6f7890a1b2c3d4e5f6a07</uuid>
+                    <name>Host: Load average (5 min)</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>system.cpu.load[all,avg5]</key>
+                    <delay>60s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>FLOAT</value_type>
+                    <description>System load average over the last 5 minutes.</description>
+                    <tags>
+                        <tag>
+                            <tag>resource</tag>
+                            <value>cpu</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>host</value>
+                        </tag>
+                    </tags>
+                </item>
+                <!-- Memory Metrics -->
+                <item>
+                    <uuid>21a2b3c4d5e6f7890a1b2c3d4e5f6b01</uuid>
+                    <name>Host: Memory utilization</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>vm.memory.utilization</key>
+                    <delay>60s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>Percentage of memory currently in use.</description>
+                    <tags>
+                        <tag>
+                            <tag>resource</tag>
+                            <value>memory</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>host</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>22a2b3c4d5e6f7890a1b2c3d4e5f6b02</uuid>
+                    <name>Host: Total memory</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>vm.memory.size[total]</key>
+                    <delay>3600s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <units>B</units>
+                    <description>Total physical memory in bytes.</description>
+                    <tags>
+                        <tag>
+                            <tag>resource</tag>
+                            <value>memory</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>host</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>23a2b3c4d5e6f7890a1b2c3d4e5f6b03</uuid>
+                    <name>Host: Available memory</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>vm.memory.size[available]</key>
+                    <delay>60s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <units>B</units>
+                    <description>Available memory (free + cached + buffers) in bytes.</description>
+                    <tags>
+                        <tag>
+                            <tag>resource</tag>
+                            <value>memory</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>host</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>24a2b3c4d5e6f7890a1b2c3d4e5f6b04</uuid>
+                    <name>Host: Swap utilization</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>system.swap.size[,pused]</key>
+                    <delay>60s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>Percentage of swap space currently in use.</description>
+                    <tags>
+                        <tag>
+                            <tag>resource</tag>
+                            <value>memory</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>host</value>
+                        </tag>
+                    </tags>
+                </item>
+                <!-- Disk Metrics -->
+                <item>
+                    <uuid>31a2b3c4d5e6f7890a1b2c3d4e5f6c01</uuid>
+                    <name>Host: Disk free space on / (percentage)</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>vfs.fs.size[/,pfree]</key>
+                    <delay>60s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>Percentage of free disk space on root filesystem.</description>
+                    <tags>
+                        <tag>
+                            <tag>resource</tag>
+                            <value>disk</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>host</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>32a2b3c4d5e6f7890a1b2c3d4e5f6c02</uuid>
+                    <name>Host: Disk total space on /</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>vfs.fs.size[/,total]</key>
+                    <delay>3600s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <units>B</units>
+                    <description>Total disk space on root filesystem in bytes.</description>
+                    <tags>
+                        <tag>
+                            <tag>resource</tag>
+                            <value>disk</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>host</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>33a2b3c4d5e6f7890a1b2c3d4e5f6c03</uuid>
+                    <name>Host: Disk used space on /</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>vfs.fs.size[/,used]</key>
+                    <delay>60s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <units>B</units>
+                    <description>Used disk space on root filesystem in bytes.</description>
+                    <tags>
+                        <tag>
+                            <tag>resource</tag>
+                            <value>disk</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>host</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>34a2b3c4d5e6f7890a1b2c3d4e5f6c04</uuid>
+                    <name>Host: Disk read rate</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>vfs.dev.read[,rate]</key>
+                    <delay>60s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>FLOAT</value_type>
+                    <units>ops/s</units>
+                    <description>Disk read operations per second.</description>
+                    <tags>
+                        <tag>
+                            <tag>resource</tag>
+                            <value>disk</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>host</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>35a2b3c4d5e6f7890a1b2c3d4e5f6c05</uuid>
+                    <name>Host: Disk write rate</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>vfs.dev.write[,rate]</key>
+                    <delay>60s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>FLOAT</value_type>
+                    <units>ops/s</units>
+                    <description>Disk write operations per second.</description>
+                    <tags>
+                        <tag>
+                            <tag>resource</tag>
+                            <value>disk</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>host</value>
+                        </tag>
+                    </tags>
+                </item>
+                <!-- Network Metrics -->
+                <item>
+                    <uuid>41a2b3c4d5e6f7890a1b2c3d4e5f6d01</uuid>
+                    <name>Host: Network incoming traffic (eth0)</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>net.if.in[eth0]</key>
+                    <delay>60s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <units>bps</units>
+                    <preprocessing>
+                        <step>
+                            <type>CHANGE_PER_SECOND</type>
+                            <parameters>
+                                <parameter/>
+                            </parameters>
+                        </step>
+                        <step>
+                            <type>MULTIPLIER</type>
+                            <parameters>
+                                <parameter>8</parameter>
+                            </parameters>
+                        </step>
+                    </preprocessing>
+                    <description>Incoming network traffic on primary interface in bits per second.</description>
+                    <tags>
+                        <tag>
+                            <tag>resource</tag>
+                            <value>network</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>host</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>42a2b3c4d5e6f7890a1b2c3d4e5f6d02</uuid>
+                    <name>Host: Network outgoing traffic (eth0)</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>net.if.out[eth0]</key>
+                    <delay>60s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <units>bps</units>
+                    <preprocessing>
+                        <step>
+                            <type>CHANGE_PER_SECOND</type>
+                            <parameters>
+                                <parameter/>
+                            </parameters>
+                        </step>
+                        <step>
+                            <type>MULTIPLIER</type>
+                            <parameters>
+                                <parameter>8</parameter>
+                            </parameters>
+                        </step>
+                    </preprocessing>
+                    <description>Outgoing network traffic on primary interface in bits per second.</description>
+                    <tags>
+                        <tag>
+                            <tag>resource</tag>
+                            <value>network</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>host</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>43a2b3c4d5e6f7890a1b2c3d4e5f6d03</uuid>
+                    <name>Host: Network incoming errors (eth0)</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>net.if.in[eth0,errors]</key>
+                    <delay>60s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <preprocessing>
+                        <step>
+                            <type>CHANGE_PER_SECOND</type>
+                            <parameters>
+                                <parameter/>
+                            </parameters>
+                        </step>
+                    </preprocessing>
+                    <description>Number of incoming network errors per second.</description>
+                    <tags>
+                        <tag>
+                            <tag>resource</tag>
+                            <value>network</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>host</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>44a2b3c4d5e6f7890a1b2c3d4e5f6d04</uuid>
+                    <name>Host: Network outgoing errors (eth0)</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>net.if.out[eth0,errors]</key>
+                    <delay>60s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <preprocessing>
+                        <step>
+                            <type>CHANGE_PER_SECOND</type>
+                            <parameters>
+                                <parameter/>
+                            </parameters>
+                        </step>
+                    </preprocessing>
+                    <description>Number of outgoing network errors per second.</description>
+                    <tags>
+                        <tag>
+                            <tag>resource</tag>
+                            <value>network</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>host</value>
+                        </tag>
+                    </tags>
+                </item>
+                <!-- =======================================================
+                     MariaDB Metrics via Zabbix Agent2
+                     Requirement: 5.4
+                     Linked to official "MySQL by Zabbix agent" template
+                     ======================================================= -->
+                <!-- Active Connections -->
+                <item>
+                    <uuid>51a2b3c4d5e6f7890a1b2c3d4e5f6e01</uuid>
+                    <name>MariaDB: Active connections (Threads_connected)</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>mysql.threads_connected[{$MYSQL.HOST},{$MYSQL.PORT},{$MYSQL.USER},{$MYSQL.PASSWORD}]</key>
+                    <delay>60s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <description>Number of currently active (connected) client threads in MariaDB.</description>
+                    <tags>
+                        <tag>
+                            <tag>service</tag>
+                            <value>mariadb</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>database</value>
+                        </tag>
+                    </tags>
+                </item>
+                <!-- Queries Per Second -->
+                <item>
+                    <uuid>52a2b3c4d5e6f7890a1b2c3d4e5f6e02</uuid>
+                    <name>MariaDB: Queries per second</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>mysql.queries[{$MYSQL.HOST},{$MYSQL.PORT},{$MYSQL.USER},{$MYSQL.PASSWORD}]</key>
+                    <delay>60s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>FLOAT</value_type>
+                    <units>qps</units>
+                    <preprocessing>
+                        <step>
+                            <type>CHANGE_PER_SECOND</type>
+                            <parameters>
+                                <parameter/>
+                            </parameters>
+                        </step>
+                    </preprocessing>
+                    <description>Number of SQL queries executed per second (QPS).</description>
+                    <tags>
+                        <tag>
+                            <tag>service</tag>
+                            <value>mariadb</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>database</value>
+                        </tag>
+                    </tags>
+                </item>
+                <!-- Slow Queries -->
+                <item>
+                    <uuid>53a2b3c4d5e6f7890a1b2c3d4e5f6e03</uuid>
+                    <name>MariaDB: Slow queries per minute</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>mysql.slow_queries[{$MYSQL.HOST},{$MYSQL.PORT},{$MYSQL.USER},{$MYSQL.PASSWORD}]</key>
+                    <delay>60s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>FLOAT</value_type>
+                    <units>queries/min</units>
+                    <preprocessing>
+                        <step>
+                            <type>CHANGE_PER_SECOND</type>
+                            <parameters>
+                                <parameter/>
+                            </parameters>
+                        </step>
+                        <step>
+                            <type>MULTIPLIER</type>
+                            <parameters>
+                                <parameter>60</parameter>
+                            </parameters>
+                        </step>
+                    </preprocessing>
+                    <description>Number of slow queries per minute (queries exceeding long_query_time).</description>
+                    <tags>
+                        <tag>
+                            <tag>service</tag>
+                            <value>mariadb</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>database</value>
+                        </tag>
+                    </tags>
+                </item>
+                <!-- Buffer Pool Usage -->
+                <item>
+                    <uuid>54a2b3c4d5e6f7890a1b2c3d4e5f6e04</uuid>
+                    <name>MariaDB: InnoDB buffer pool utilization</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>mysql.innodb_buffer_pool_utilization[{$MYSQL.HOST},{$MYSQL.PORT},{$MYSQL.USER},{$MYSQL.PASSWORD}]</key>
+                    <delay>60s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>Percentage of InnoDB buffer pool pages currently in use.</description>
+                    <tags>
+                        <tag>
+                            <tag>service</tag>
+                            <value>mariadb</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>database</value>
+                        </tag>
+                    </tags>
+                </item>
+                <!-- Buffer Pool Size -->
+                <item>
+                    <uuid>55a2b3c4d5e6f7890a1b2c3d4e5f6e05</uuid>
+                    <name>MariaDB: InnoDB buffer pool size</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>mysql.innodb_buffer_pool_size[{$MYSQL.HOST},{$MYSQL.PORT},{$MYSQL.USER},{$MYSQL.PASSWORD}]</key>
+                    <delay>3600s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <units>B</units>
+                    <description>Total InnoDB buffer pool size in bytes.</description>
+                    <tags>
+                        <tag>
+                            <tag>service</tag>
+                            <value>mariadb</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>database</value>
+                        </tag>
+                    </tags>
+                </item>
+                <!-- =======================================================
+                     Backup Status Monitoring
+                     Requirement: 5.8 (backup failure alerting)
+                     ======================================================= -->
+                <item>
+                    <uuid>61a2b3c4d5e6f7890a1b2c3d4e5f6f01</uuid>
+                    <name>rAthena: Backup last status</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>vfs.file.contents[/backups/last_backup_status]</key>
+                    <delay>300s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <description>Last backup exit code. 0 = success, non-zero = failure. File written by backup.sh after each execution.</description>
+                    <tags>
+                        <tag>
+                            <tag>service</tag>
+                            <value>backup</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>rathena</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>62a2b3c4d5e6f7890a1b2c3d4e5f6f02</uuid>
+                    <name>rAthena: Backup last timestamp</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>vfs.file.time[/backups/last_backup_status,modify]</key>
+                    <delay>300s</delay>
+                    <history>90d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <units>unixtime</units>
+                    <description>Timestamp of the last backup status file modification (indicates when the last backup ran).</description>
+                    <tags>
+                        <tag>
+                            <tag>service</tag>
+                            <value>backup</value>
+                        </tag>
+                        <tag>
+                            <tag>component</tag>
+                            <value>rathena</value>
+                        </tag>
+                    </tags>
+                </item>
+            </items>
+            <triggers>
+                <!-- =======================================================
+                     DISASTER Severity Triggers
+                     ======================================================= -->
+                <!-- TCP Service Failures (Requirement 5.8) -->
+                <trigger>
+                    <uuid>e8b9c0d1f2a34567b890123456781cde</uuid>
+                    <expression>max(/rAthena Services/net.tcp.port[{$RATHENA.HOST},{$RATHENA.LOGIN.PORT}],{$TCP.FAIL.DURATION})=0</expression>
+                    <name>rAthena Login Server is DOWN (port {$RATHENA.LOGIN.PORT} unreachable for {$TCP.FAIL.DURATION})</name>
+                    <priority>DISASTER</priority>
+                    <description>Login Server has not responded on TCP port {$RATHENA.LOGIN.PORT} for {$TCP.FAIL.DURATION}. Players cannot authenticate or connect to the game.</description>
+                    <tags>
+                        <tag>
+                            <tag>scope</tag>
+                            <value>availability</value>
+                        </tag>
+                        <tag>
+                            <tag>service</tag>
+                            <value>login-server</value>
+                        </tag>
+                    </tags>
+                </trigger>
+                <trigger>
+                    <uuid>f9c0d1e2a3b45678c901234567892def</uuid>
+                    <expression>max(/rAthena Services/net.tcp.port[{$RATHENA.HOST},{$RATHENA.CHAR.PORT}],{$TCP.FAIL.DURATION})=0</expression>
+                    <name>rAthena Char Server is DOWN (port {$RATHENA.CHAR.PORT} unreachable for {$TCP.FAIL.DURATION})</name>
+                    <priority>DISASTER</priority>
+                    <description>Char Server has not responded on TCP port {$RATHENA.CHAR.PORT} for {$TCP.FAIL.DURATION}. Players cannot select characters or enter the game.</description>
+                    <tags>
+                        <tag>
+                            <tag>scope</tag>
+                            <value>availability</value>
+                        </tag>
+                        <tag>
+                            <tag>service</tag>
+                            <value>char-server</value>
+                        </tag>
+                    </tags>
+                </trigger>
+                <trigger>
+                    <uuid>a0d1e2f3b4c56789d012345678903efa</uuid>
+                    <expression>max(/rAthena Services/net.tcp.port[{$RATHENA.HOST},{$RATHENA.MAP.PORT}],{$TCP.FAIL.DURATION})=0</expression>
+                    <name>rAthena Map Server is DOWN (port {$RATHENA.MAP.PORT} unreachable for {$TCP.FAIL.DURATION})</name>
+                    <priority>DISASTER</priority>
+                    <description>Map Server has not responded on TCP port {$RATHENA.MAP.PORT} for {$TCP.FAIL.DURATION}. Players are disconnected from the game world.</description>
+                    <tags>
+                        <tag>
+                            <tag>scope</tag>
+                            <value>availability</value>
+                        </tag>
+                        <tag>
+                            <tag>service</tag>
+                            <value>map-server</value>
+                        </tag>
+                    </tags>
+                </trigger>
+                <!-- Disk Space Critical (Requirement 5.7) -->
+                <trigger>
+                    <uuid>b1e2f3a4c5d67890e1234567890a4fab</uuid>
+                    <expression>last(/rAthena Services/vfs.fs.size[/,pfree])&lt;{$DISK.THRESHOLD.DISASTER}</expression>
+                    <name>Disk space critically low (free &lt;{$DISK.THRESHOLD.DISASTER}%)</name>
+                    <priority>DISASTER</priority>
+                    <description>Free disk space has dropped below {$DISK.THRESHOLD.DISASTER}%. Immediate action required — database writes and backups may fail.</description>
+                    <tags>
+                        <tag>
+                            <tag>scope</tag>
+                            <value>capacity</value>
+                        </tag>
+                        <tag>
+                            <tag>resource</tag>
+                            <value>disk</value>
+                        </tag>
+                    </tags>
+                </trigger>
+                <!-- =======================================================
+                     HIGH Severity Triggers
+                     ======================================================= -->
+                <!-- CPU Utilization with guard >0% (Requirement 5.5) -->
+                <trigger>
+                    <uuid>c2f3a4b5d6e78901f23456789015abc0</uuid>
+                    <expression>min(/rAthena Services/system.cpu.util[,idle],5m)&lt;(100-{$CPU.THRESHOLD.HIGH}) and min(/rAthena Services/system.cpu.util[,idle],5m)&gt;0</expression>
+                    <name>CPU utilization is too high (&gt;{$CPU.THRESHOLD.HIGH}% for 5 min)</name>
+                    <priority>HIGH</priority>
+                    <description>CPU utilization has exceeded {$CPU.THRESHOLD.HIGH}% for the last 5 minutes. Guard condition: idle must be &gt;0% to avoid false alerts from invalid 0% readings. Investigate resource-heavy processes or consider scaling.</description>
+                    <tags>
+                        <tag>
+                            <tag>scope</tag>
+                            <value>performance</value>
+                        </tag>
+                        <tag>
+                            <tag>resource</tag>
+                            <value>cpu</value>
+                        </tag>
+                    </tags>
+                </trigger>
+                <!-- Memory Utilization (Requirement 5.6) -->
+                <trigger>
+                    <uuid>d3a4b5c6e7f89012a345678901260bcd</uuid>
+                    <expression>min(/rAthena Services/vm.memory.utilization,3m)&gt;{$MEMORY.THRESHOLD.HIGH}</expression>
+                    <name>Memory utilization is too high (&gt;{$MEMORY.THRESHOLD.HIGH}% for 3 min)</name>
+                    <priority>HIGH</priority>
+                    <description>Memory utilization has exceeded {$MEMORY.THRESHOLD.HIGH}% for the last 3 minutes. Risk of OOM killer activation. Consider adding swap or increasing memory allocation.</description>
+                    <tags>
+                        <tag>
+                            <tag>scope</tag>
+                            <value>performance</value>
+                        </tag>
+                        <tag>
+                            <tag>resource</tag>
+                            <value>memory</value>
+                        </tag>
+                    </tags>
+                </trigger>
+                <!-- Backup Failed (Requirement 5.8) -->
+                <trigger>
+                    <uuid>71a2b3c4d5e6f7890a1b2c3d4e5f7a01</uuid>
+                    <expression>last(/rAthena Services/vfs.file.contents[/backups/last_backup_status])&lt;&gt;0</expression>
+                    <name>rAthena backup failed (exit code &lt;&gt; 0)</name>
+                    <priority>HIGH</priority>
+                    <description>The last database backup failed with a non-zero exit code. Check backup logs in /backups/ for details. Manual intervention may be required to restore backup functionality.</description>
+                    <dependencies>
+                        <dependency>
+                            <name>Disk space critically low (free &lt;{$DISK.THRESHOLD.DISASTER}%)</name>
+                            <expression>last(/rAthena Services/vfs.fs.size[/,pfree])&lt;{$DISK.THRESHOLD.DISASTER}</expression>
+                        </dependency>
+                    </dependencies>
+                    <tags>
+                        <tag>
+                            <tag>scope</tag>
+                            <value>availability</value>
+                        </tag>
+                        <tag>
+                            <tag>service</tag>
+                            <value>backup</value>
+                        </tag>
+                    </tags>
+                </trigger>
+                <!-- =======================================================
+                     WARNING Severity Triggers
+                     ======================================================= -->
+                <!-- Slow Queries (Requirement 5.4) -->
+                <trigger>
+                    <uuid>81a2b3c4d5e6f7890a1b2c3d4e5f8a01</uuid>
+                    <expression>last(/rAthena Services/mysql.slow_queries[{$MYSQL.HOST},{$MYSQL.PORT},{$MYSQL.USER},{$MYSQL.PASSWORD}])&gt;{$SLOW.QUERIES.THRESHOLD}</expression>
+                    <name>MariaDB: Slow queries exceed {$SLOW.QUERIES.THRESHOLD}/min</name>
+                    <priority>WARNING</priority>
+                    <description>MariaDB is executing more than {$SLOW.QUERIES.THRESHOLD} slow queries per minute (queries exceeding long_query_time=2s). Review slow query log at /var/lib/mysql/slow-query.log and consider query optimization or index additions.</description>
+                    <tags>
+                        <tag>
+                            <tag>scope</tag>
+                            <value>performance</value>
+                        </tag>
+                        <tag>
+                            <tag>service</tag>
+                            <value>mariadb</value>
+                        </tag>
+                    </tags>
+                </trigger>
+            </triggers>
+        </template>
+    </templates>
+    <!-- =======================================================
+         Media Type: rAthena Webhook Notifications
+         Configurable webhook for Discord/Telegram/Slack
+         Requirement: 5.10
+         ======================================================= -->
+    <media_types>
+        <media_type>
+            <uuid>e4b5c6d7f8a90123b456789012371cde</uuid>
+            <name>rAthena Alert Webhook</name>
+            <type>WEBHOOK</type>
+            <parameters>
+                <parameter>
+                    <name>webhook_url</name>
+                    <value>{$ALERT.WEBHOOK.URL}</value>
+                </parameter>
+                <parameter>
+                    <name>webhook_type</name>
+                    <value>{$ALERT.WEBHOOK.TYPE}</value>
+                </parameter>
+                <parameter>
+                    <name>subject</name>
+                    <value>{TRIGGER.NAME}</value>
+                </parameter>
+                <parameter>
+                    <name>message</name>
+                    <value>{TRIGGER.NAME}: {TRIGGER.STATUS} — Severity: {TRIGGER.SEVERITY}
+Host: {HOST.NAME}
+Time: {EVENT.DATE} {EVENT.TIME}
+Details: {ITEM.LASTVALUE}</value>
+                </parameter>
+                <parameter>
+                    <name>severity</name>
+                    <value>{TRIGGER.SEVERITY}</value>
+                </parameter>
+                <parameter>
+                    <name>event_id</name>
+                    <value>{EVENT.ID}</value>
+                </parameter>
+            </parameters>
+            <script>
+var params = JSON.parse(value);
+var url = params.webhook_url;
+var type = params.webhook_type;
+var subject = params.subject;
+var message = params.message;
+var severity = params.severity;
+
+if (!url) {
+    throw 'Webhook URL not configured. Set {$ALERT.WEBHOOK.URL} macro.';
+}
+
+var payload;
+
+switch (type) {
+    case 'discord':
+        var color = severity === 'Disaster' ? 16711680 : severity === 'High' ? 16744448 : 16776960;
+        payload = JSON.stringify({
+            embeds: [{
+                title: '\u26a0\ufe0f ' + subject,
+                description: message,
+                color: color,
+                footer: { text: 'Zabbix Alert \u2014 rAthena Server' },
+                timestamp: new Date().toISOString()
+            }]
+        });
+        break;
+    case 'telegram':
+        payload = JSON.stringify({
+            chat_id: params.telegram_chat_id || '',
+            text: '\u26a0\ufe0f *' + subject + '*\n\n' + message,
+            parse_mode: 'Markdown'
+        });
+        break;
+    case 'slack':
+        var emoji = severity === 'Disaster' ? '\ud83d\udd34' : severity === 'High' ? '\ud83d\udfe0' : '\ud83d\udfe1';
+        payload = JSON.stringify({
+            blocks: [{
+                type: 'section',
+                text: {
+                    type: 'mrkdwn',
+                    text: emoji + ' *' + subject + '*\n' + message
+                }
+            }]
+        });
+        break;
+    default:
+        throw 'Unknown webhook type: ' + type + '. Supported: discord, telegram, slack';
+}
+
+var req = new HttpRequest();
+req.addHeader('Content-Type: application/json');
+var resp = req.post(url, payload);
+
+if (req.getStatus() &lt; 200 || req.getStatus() &gt;= 300) {
+    throw 'Webhook failed with status ' + req.getStatus() + ': ' + resp;
+}
+
+return 'OK';
+            </script>
+            <description>Sends alert notifications to Discord, Telegram, or Slack via webhook.&#13;
+&#13;
+Configuration:&#13;
+1. Set {$ALERT.WEBHOOK.URL} macro to your webhook endpoint URL&#13;
+2. Set {$ALERT.WEBHOOK.TYPE} macro to: discord, telegram, or slack&#13;
+3. For Telegram, configure the chat_id in webhook parameters&#13;
+&#13;
+Severity color mapping:&#13;
+- Disaster: Red (16711680)&#13;
+- High: Orange (16744448)&#13;
+- Warning: Yellow (16776960)</description>
+            <message_templates>
+                <message_template>
+                    <event_source>TRIGGERS</event_source>
+                    <operation_mode>PROBLEM</operation_mode>
+                    <subject>{TRIGGER.NAME}: {TRIGGER.STATUS}</subject>
+                    <message>{TRIGGER.NAME}: {TRIGGER.STATUS}
+Severity: {TRIGGER.SEVERITY}
+Host: {HOST.NAME}
+Time: {EVENT.DATE} {EVENT.TIME}
+Details: {ITEM.LASTVALUE}</message>
+                </message_template>
+                <message_template>
+                    <event_source>TRIGGERS</event_source>
+                    <operation_mode>RECOVERY</operation_mode>
+                    <subject>RESOLVED: {TRIGGER.NAME}</subject>
+                    <message>RESOLVED: {TRIGGER.NAME}
+Host: {HOST.NAME}
+Recovery time: {EVENT.RECOVERY.DATE} {EVENT.RECOVERY.TIME}
+Duration: {EVENT.DURATION}</message>
+                </message_template>
+            </message_templates>
+        </media_type>
+    </media_types>
+</zabbix_export>

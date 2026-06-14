@@ -1,0 +1,42 @@
+// rAthena Map Server Configuration Template
+// Processed by envsubst at container startup
+// Output: /rathena/conf/generated/map_athena.conf
+
+// Map Server Network Settings
+map_port: ${MAP_SERVER_PORT}
+
+// Bind address
+bind_ip: ${MAP_BIND_IP}
+
+// Char Server connection (inter-server communication)
+char_ip: ${CHAR_SERVER_IP}
+char_port: ${CHAR_SERVER_PORT}
+
+// WAN IP shown to players connecting from outside
+map_ip: ${SERVER_PUBLIC_IP}
+
+// Timestamp format in logs
+timestamp_format: ${LOG_TIMESTAMP_FORMAT}
+
+// Console output
+stdout_with_ansisequence: no
+console_silent: 0
+
+// Map cache file
+map_cache_file: db/map_cache.dat
+
+// NPC and script configuration
+npc_file: npc/scripts_main.conf
+npc_file: npc/scripts_custom.conf
+
+// Autosave interval (in seconds)
+autosave_time: ${MAP_AUTOSAVE_TIME}
+
+// Map server behavior
+enable_spy: no
+
+// Minimal save for characters (seconds)
+minsave_time: ${MAP_MINSAVE_TIME}
+
+// Use SQL for mob/item DB
+use_sql_db: ${MAP_USE_SQL_DB}

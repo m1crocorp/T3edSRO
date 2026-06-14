@@ -1,0 +1,40 @@
+// rAthena Inter-Server Configuration Template
+// Processed by envsubst at container startup
+// Output: /rathena/conf/generated/inter_athena.conf
+
+// MySQL Database Connection
+login_server_ip: ${DB_HOST}
+login_server_port: ${DB_PORT}
+login_server_id: ${RATHENA_DB_USER}
+login_server_pw: ${RATHENA_DB_PASSWORD}
+login_server_db: ${RATHENA_DB_NAME}
+
+ipban_db_ip: ${DB_HOST}
+ipban_db_port: ${DB_PORT}
+ipban_db_id: ${RATHENA_DB_USER}
+ipban_db_pw: ${RATHENA_DB_PASSWORD}
+ipban_db_db: ${RATHENA_DB_NAME}
+
+char_server_ip: ${DB_HOST}
+char_server_port: ${DB_PORT}
+char_server_id: ${RATHENA_DB_USER}
+char_server_pw: ${RATHENA_DB_PASSWORD}
+char_server_db: ${RATHENA_DB_NAME}
+
+map_server_ip: ${DB_HOST}
+map_server_port: ${DB_PORT}
+map_server_id: ${RATHENA_DB_USER}
+map_server_pw: ${RATHENA_DB_PASSWORD}
+map_server_db: ${RATHENA_DB_NAME}
+
+log_db_ip: ${DB_HOST}
+log_db_port: ${DB_PORT}
+log_db_id: ${RATHENA_DB_USER}
+log_db_pw: ${RATHENA_DB_PASSWORD}
+log_db_db: ${RATHENA_LOG_DB_NAME}
+
+// Default codepage for database
+default_codepage: ${DB_CODEPAGE}
+
+// Inter-server password (must match across all servers)
+passwd: ${INTER_SERVER_PASSWORD}

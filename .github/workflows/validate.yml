@@ -1,0 +1,154 @@
+# ============================================================
+# Validation Workflow - Pull Request Checks
+# ============================================================
+# Triggers on pull_request events to validate:
+# - Dockerfile best practices (hadolint)
+# - Shell script quality (shellcheck)
+# - Docker Compose syntax
+# - Environment variable completeness
+# - Docker image builds (no push)
+# - Security vulnerabilities (Trivy)
+#
+# Requirements: 4.1, 4.2, 4.5, 4.6, 4.10
+# ============================================================
+
+name: Validate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  validate:
+    name: Validate Infrastructure
+    runs-on: ubuntu-latest
+
+    steps:
+      # -------------------------------------------------------
+      # 1. Checkout code
+      # -------------------------------------------------------
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # -------------------------------------------------------
+      # 2. Lint Dockerfiles with hadolint
+      # -------------------------------------------------------
+      - name: Lint Dockerfiles (hadolint)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          config: .hadolint.yaml
+
+      - name: Lint FluxCP Dockerfile (hadolint)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: docker/fluxcp/Dockerfile
+          config: .hadolint.yaml
+
+      # -------------------------------------------------------
+      # 3. Lint shell scripts with shellcheck
+      # -------------------------------------------------------
+      - name: Find and lint shell scripts (shellcheck)
+        run: |
+          echo "::group::Finding shell scripts"
+          SCRIPTS=$(find scripts/ docker/ sql/ -name "*.sh" -type f | sort)
+          echo "Found scripts:"
+          echo "$SCRIPTS"
+          echo "::endgroup::"
+
+          echo "::group::Running shellcheck"
+          echo "$SCRIPTS" | xargs shellcheck --severity=warning --shell=bash
+          echo "::endgroup::"
+
+      # -------------------------------------------------------
+      # 4. Validate Docker Compose syntax
+      # -------------------------------------------------------
+      - name: Validate Docker Compose syntax
+        run: |
+          cp .env.example .env
+          docker compose config --quiet
+
+      # -------------------------------------------------------
+      # 5. Validate .env.example completeness
+      # -------------------------------------------------------
+      - name: Validate environment variables
+        run: |
+          echo "::group::Checking .env.example completeness"
+
+          # Extract variables referenced in docker-compose.yml (${VAR} and ${VAR:-default} patterns)
+          COMPOSE_VARS=$(grep -oP '\$\{([A-Z_][A-Z0-9_]*)' docker-compose.yml | sed 's/\${//' | sort -u)
+
+          # Extract variables referenced in conf/templates/
+          TEMPLATE_VARS=$(grep -roP '\$\{([A-Z_][A-Z0-9_]*)' conf/templates/ 2>/dev/null | grep -oP '\$\{([A-Z_][A-Z0-9_]*)' | sed 's/\${//' | sort -u)
+
+          # Combine all referenced variables
+          ALL_VARS=$(echo -e "${COMPOSE_VARS}\n${TEMPLATE_VARS}" | sort -u | grep -v '^$')
+
+          # Extract variables defined in .env.example (non-comment, non-empty lines with KEY=value)
+          ENV_VARS=$(grep -oP '^[A-Z_][A-Z0-9_]*(?==)' .env.example | sort -u)
+
+          # Find missing variables
+          MISSING=""
+          while IFS= read -r var; do
+            if ! echo "$ENV_VARS" | grep -qx "$var"; then
+              MISSING="${MISSING}${var}\n"
+            fi
+          done <<< "$ALL_VARS"
+
+          if [ -n "$MISSING" ]; then
+            echo "::error::The following variables are referenced but NOT defined in .env.example:"
+            echo -e "$MISSING"
+            exit 1
+          fi
+
+          echo "All referenced variables are defined in .env.example"
+          echo "::endgroup::"
+
+      # -------------------------------------------------------
+      # 6. Build test images (no push)
+      # -------------------------------------------------------
+      - name: Build Docker images (test build, no push)
+        env:
+          COMPOSE_PROJECT_NAME: rathena
+        run: |
+          cp .env.example .env
+          docker compose build --no-cache
+
+      # -------------------------------------------------------
+      # 7. Trivy vulnerability scan on built images
+      # -------------------------------------------------------
+      - name: Run Trivy scan on login-server image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: "rathena-login-server:latest"
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - name: Run Trivy scan on char-server image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: "rathena-char-server:latest"
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - name: Run Trivy scan on map-server image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: "rathena-map-server:latest"
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - name: Run Trivy scan on fluxcp image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: "rathena-fluxcp:latest"
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true

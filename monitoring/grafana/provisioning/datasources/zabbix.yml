@@ -1,0 +1,49 @@
+# ============================================================
+# Grafana Datasource Provisioning - Zabbix API
+# ============================================================
+# This file configures the Zabbix plugin datasource to connect
+# to the Zabbix Server API via the internal Docker network.
+#
+# Plugin: alexanderzobnin-zabbix-app
+# Docs: https://alexanderzobnin.github.io/grafana-zabbix/
+#
+# The Grafana container communicates with zabbix-web on the
+# rathena-internal network. The API endpoint is served by
+# the Zabbix Web Frontend (Nginx) container.
+# ============================================================
+
+apiVersion: 1
+
+deleteDatasources:
+  - name: Zabbix
+    orgId: 1
+
+datasources:
+  - name: Zabbix
+    type: alexanderzobnin-zabbix-datasource
+    uid: zabbix
+    access: proxy
+    orgId: 1
+    isDefault: true
+    editable: false
+    jsonData:
+      # Zabbix Web API URL - internal Docker network
+      # Uses HTTP on port 8080 (internal) for inter-container communication
+      url: "http://zabbix-web:8080/api_jsonrpc.php"
+      # Authentication - Zabbix default admin credentials
+      # Change these in production via Zabbix Web UI after first login
+      username: "Admin"
+      # Trends configuration
+      trends: true
+      trendsFrom: "7d"
+      trendsRange: "4d"
+      # Cache TTL - reduces API calls to Zabbix
+      cacheTTL: "1m"
+      # Request timeout in seconds
+      timeout: 30
+      # Direct DB connection disabled - use API only for security
+      dbConnectionEnable: false
+    secureJsonData:
+      # Default Zabbix admin password - MUST be changed in production
+      password: "zabbix"
+    version: 1

@@ -1,0 +1,11 @@
+# Hadolint Configuration
+# https://github.com/hadolint/hadolint#configure
+
+# Ignored rules:
+# DL3008 - Pin versions in apt-get install
+#   Justification: Base images (debian:bookworm-slim, php:8.2-apache) already
+#   pin to specific Debian releases. Package versions are controlled by the
+#   base image's repository. Pinning apt package versions adds maintenance
+#   burden without significant security benefit for this use case.
+ignored:
+  - DL3008

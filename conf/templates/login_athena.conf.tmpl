@@ -1,0 +1,41 @@
+// rAthena Login Server Configuration Template
+// Processed by envsubst at container startup
+// Output: /rathena/conf/generated/login_athena.conf
+
+// Login Server Network Settings
+login_port: ${LOGIN_SERVER_PORT}
+
+// Bind address (0.0.0.0 to accept connections from all interfaces)
+bind_ip: ${LOGIN_BIND_IP}
+
+// Timestamp format in logs
+timestamp_format: ${LOG_TIMESTAMP_FORMAT}
+
+// Console output (stdout logging)
+stdout_with_ansisequence: no
+console_silent: 0
+
+// Account registration settings
+new_account: ${LOGIN_NEW_ACCOUNT}
+
+// Allowed registration attempts per time window (DDoS protection)
+allowed_regs: ${LOGIN_ALLOWED_REGS}
+time_allowed: ${LOGIN_TIME_ALLOWED}
+
+// IP ban settings
+ipban_enable: ${LOGIN_IPBAN_ENABLE}
+ipban_cleanup_interval: 60
+ip_sync_interval: 0
+
+// Use MD5 hash for passwords
+use_MD5_passwords: ${LOGIN_USE_MD5}
+
+// Login-server specific logging
+log_login: yes
+
+// Group ID for new accounts
+group_id_to_connect: -1
+min_group_id_to_connect: -1
+
+// Client hash check (anti-cheat)
+client_hash_check: ${LOGIN_HASH_CHECK}

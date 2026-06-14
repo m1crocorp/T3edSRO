@@ -1,0 +1,583 @@
+# ============================================================
+# rAthena Server Infrastructure - Docker Compose
+# ============================================================
+# Docker Compose v2+ (no version key needed)
+#
+# Startup Order:
+#   MariaDB → Login Server → Char Server → Map Server
+#   MariaDB → Zabbix Server → Zabbix Web / Zabbix Agent / Grafana
+#   MariaDB → FluxCP
+#
+# Networks:
+#   rathena-internal: isolated bridge (no external access)
+#   rathena-external: bridge with port bindings to host
+#
+# Usage:
+#   docker compose up -d
+#   docker compose logs -f
+#   docker compose down
+# ============================================================
+
+# ==========================
+# NAMED VOLUMES
+# ==========================
+volumes:
+  rathena-db-data:
+    driver: local
+  rathena-backups:
+    driver: local
+  grafana-data:
+    driver: local
+  zabbix-server-data:
+    driver: local
+  fluxcp-data:
+    driver: local
+
+# ==========================
+# NETWORKS
+# ==========================
+networks:
+  rathena-internal:
+    driver: bridge
+    internal: true
+  rathena-external:
+    driver: bridge
+
+# ==========================
+# SERVICES
+# ==========================
+services:
+
+  # --------------------------------------------------------
+  # MariaDB 11.4 LTS - Database Server
+  # --------------------------------------------------------
+  mariadb:
+    image: mariadb:11.4
+    container_name: rathena-mariadb
+    entrypoint: /usr/local/bin/mariadb-entrypoint-wrapper.sh
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+      RATHENA_DB_USER: ${RATHENA_DB_USER}
+      RATHENA_DB_PASSWORD: ${RATHENA_DB_PASSWORD}
+      RATHENA_DB_NAME: ${RATHENA_DB_NAME}
+      RATHENA_LOG_DB_NAME: ${RATHENA_LOG_DB_NAME}
+      BACKUP_DB_USER: ${BACKUP_DB_USER}
+      BACKUP_DB_PASSWORD: ${BACKUP_DB_PASSWORD}
+      FLUXCP_DB_USER: ${FLUXCP_DB_USER}
+      FLUXCP_DB_PASSWORD: ${FLUXCP_DB_PASSWORD}
+      ZBX_DB_USER: ${ZBX_DB_USER}
+      ZBX_DB_PASSWORD: ${ZBX_DB_PASSWORD}
+      ZBX_DB_NAME: ${ZBX_DB_NAME}
+    volumes:
+      - rathena-db-data:/var/lib/mysql
+      - ./sql:/docker-entrypoint-initdb.d:ro
+      - ./db/conf.d:/etc/mysql/conf.d:ro
+      - ./docker/mariadb-entrypoint-wrapper.sh:/usr/local/bin/mariadb-entrypoint-wrapper.sh:ro
+    networks:
+      - rathena-internal
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 3
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2048M
+        reservations:
+          cpus: "0.5"
+          memory: 1024M
+
+  # --------------------------------------------------------
+  # Login Server - Authentication service (port 6900)
+  # --------------------------------------------------------
+  login-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: login-server
+      args:
+        PACKETVER: ${PACKETVER:-20211103}
+        RATHENA_BRANCH: ${RATHENA_BRANCH:-master}
+    container_name: rathena-login
+    ports:
+      - "${LOGIN_SERVER_PORT:-6900}:6900"
+    environment:
+      DB_HOST: ${DB_HOST:-mariadb}
+      DB_PORT: ${DB_PORT:-3306}
+      RATHENA_DB_USER: ${RATHENA_DB_USER}
+      RATHENA_DB_PASSWORD: ${RATHENA_DB_PASSWORD}
+      RATHENA_DB_NAME: ${RATHENA_DB_NAME}
+      RATHENA_LOG_DB_NAME: ${RATHENA_LOG_DB_NAME}
+      INTER_SERVER_PASSWORD: ${INTER_SERVER_PASSWORD}
+      SERVER_PUBLIC_IP: ${SERVER_PUBLIC_IP:-127.0.0.1}
+      LOGIN_SERVER_PORT: ${LOGIN_SERVER_PORT:-6900}
+      LOGIN_ALLOWED_REGS: ${LOGIN_ALLOWED_REGS:-5}
+      LOGIN_TIME_ALLOWED: ${LOGIN_TIME_ALLOWED:-60}
+      LOGIN_BIND_IP: ${LOGIN_BIND_IP:-0.0.0.0}
+      LOGIN_NEW_ACCOUNT: ${LOGIN_NEW_ACCOUNT:-yes}
+      LOGIN_IPBAN_ENABLE: ${LOGIN_IPBAN_ENABLE:-yes}
+      LOGIN_USE_MD5: ${LOGIN_USE_MD5:-no}
+      LOGIN_HASH_CHECK: ${LOGIN_HASH_CHECK:-0}
+      DB_CODEPAGE: ${DB_CODEPAGE:-utf8}
+      LOG_TIMESTAMP_FORMAT: ${LOG_TIMESTAMP_FORMAT:-[%Y-%m-%d %H:%M:%S]}
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    networks:
+      - rathena-internal
+      - rathena-external
+    volumes:
+      - ./conf/templates:/rathena/conf/templates:ro
+      - /opt/rathena/logs/login:/rathena/log
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
+      - /rathena/conf/generated
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+  # --------------------------------------------------------
+  # Char Server - Character management service (port 6121)
+  # --------------------------------------------------------
+  char-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: char-server
+      args:
+        PACKETVER: ${PACKETVER:-20211103}
+        RATHENA_BRANCH: ${RATHENA_BRANCH:-master}
+    container_name: rathena-char
+    ports:
+      - "${CHAR_SERVER_PORT:-6121}:6121"
+    environment:
+      DB_HOST: ${DB_HOST:-mariadb}
+      DB_PORT: ${DB_PORT:-3306}
+      RATHENA_DB_USER: ${RATHENA_DB_USER}
+      RATHENA_DB_PASSWORD: ${RATHENA_DB_PASSWORD}
+      RATHENA_DB_NAME: ${RATHENA_DB_NAME}
+      RATHENA_LOG_DB_NAME: ${RATHENA_LOG_DB_NAME}
+      INTER_SERVER_PASSWORD: ${INTER_SERVER_PASSWORD}
+      SERVER_PUBLIC_IP: ${SERVER_PUBLIC_IP:-127.0.0.1}
+      CHAR_SERVER_PORT: ${CHAR_SERVER_PORT:-6121}
+      LOGIN_SERVER_PORT: ${LOGIN_SERVER_PORT:-6900}
+      LOGIN_SERVER_IP: ${LOGIN_SERVER_IP:-127.0.0.1}
+      SERVER_NAME: ${SERVER_NAME:-MyRO}
+      CHAR_BIND_IP: ${CHAR_BIND_IP:-0.0.0.0}
+      CHAR_START_POINT: ${CHAR_START_POINT:-new_1-1,53,111}
+      CHAR_START_ZENY: ${CHAR_START_ZENY:-0}
+      CHAR_PER_ACCOUNT: ${CHAR_PER_ACCOUNT:-9}
+      CHAR_DEL_DELAY: ${CHAR_DEL_DELAY:-86400}
+      CHAR_NAME_LETTERS: ${CHAR_NAME_LETTERS:-0}
+      CHAR_NAME_OPTION: ${CHAR_NAME_OPTION:-1}
+      CHAR_PINCODE_ENABLED: ${CHAR_PINCODE_ENABLED:-yes}
+      DB_CODEPAGE: ${DB_CODEPAGE:-utf8}
+      LOG_TIMESTAMP_FORMAT: ${LOG_TIMESTAMP_FORMAT:-[%Y-%m-%d %H:%M:%S]}
+    depends_on:
+      login-server:
+        condition: service_healthy
+    networks:
+      - rathena-internal
+      - rathena-external
+    volumes:
+      - ./conf/templates:/rathena/conf/templates:ro
+      - /opt/rathena/logs/char:/rathena/log
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
+      - /rathena/conf/generated
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+  # --------------------------------------------------------
+  # Map Server - Game logic service (port 5121)
+  # --------------------------------------------------------
+  map-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: map-server
+      args:
+        PACKETVER: ${PACKETVER:-20211103}
+        RATHENA_BRANCH: ${RATHENA_BRANCH:-master}
+    container_name: rathena-map
+    ports:
+      - "${MAP_SERVER_PORT:-5121}:5121"
+    environment:
+      DB_HOST: ${DB_HOST:-mariadb}
+      DB_PORT: ${DB_PORT:-3306}
+      RATHENA_DB_USER: ${RATHENA_DB_USER}
+      RATHENA_DB_PASSWORD: ${RATHENA_DB_PASSWORD}
+      RATHENA_DB_NAME: ${RATHENA_DB_NAME}
+      RATHENA_LOG_DB_NAME: ${RATHENA_LOG_DB_NAME}
+      INTER_SERVER_PASSWORD: ${INTER_SERVER_PASSWORD}
+      SERVER_PUBLIC_IP: ${SERVER_PUBLIC_IP:-127.0.0.1}
+      MAP_SERVER_PORT: ${MAP_SERVER_PORT:-5121}
+      CHAR_SERVER_PORT: ${CHAR_SERVER_PORT:-6121}
+      CHAR_SERVER_IP: ${CHAR_SERVER_IP:-127.0.0.1}
+      MAP_BIND_IP: ${MAP_BIND_IP:-0.0.0.0}
+      MAP_AUTOSAVE_TIME: ${MAP_AUTOSAVE_TIME:-300}
+      MAP_MINSAVE_TIME: ${MAP_MINSAVE_TIME:-100}
+      MAP_USE_SQL_DB: ${MAP_USE_SQL_DB:-no}
+      DB_CODEPAGE: ${DB_CODEPAGE:-utf8}
+      LOG_TIMESTAMP_FORMAT: ${LOG_TIMESTAMP_FORMAT:-[%Y-%m-%d %H:%M:%S]}
+    depends_on:
+      char-server:
+        condition: service_healthy
+    networks:
+      - rathena-internal
+      - rathena-external
+    volumes:
+      - ./conf/templates:/rathena/conf/templates:ro
+      - ./npc/custom:/rathena/npc/custom:ro
+      - /opt/rathena/logs/map:/rathena/log
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
+      - /rathena/conf/generated
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2048M
+        reservations:
+          cpus: "1.0"
+          memory: 1024M
+
+  # --------------------------------------------------------
+  # Zabbix Server - Monitoring backend
+  # --------------------------------------------------------
+  zabbix-server:
+    image: zabbix/zabbix-server-mysql:7.0-ubuntu-latest
+    container_name: rathena-zabbix-server
+    environment:
+      DB_SERVER_HOST: mariadb
+      DB_SERVER_PORT: "3306"
+      MYSQL_USER: ${ZBX_DB_USER}
+      MYSQL_PASSWORD: ${ZBX_DB_PASSWORD}
+      MYSQL_DATABASE: ${ZBX_DB_NAME}
+      MYSQL_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    networks:
+      - rathena-internal
+    volumes:
+      - zabbix-server-data:/var/lib/zabbix
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 10051 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 3
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 512M
+
+  # --------------------------------------------------------
+  # Zabbix Web Frontend - Monitoring UI (port 443)
+  # --------------------------------------------------------
+  zabbix-web:
+    image: zabbix/zabbix-web-nginx-mysql:7.0-ubuntu-latest
+    container_name: rathena-zabbix-web
+    environment:
+      DB_SERVER_HOST: mariadb
+      DB_SERVER_PORT: "3306"
+      MYSQL_USER: ${ZBX_DB_USER}
+      MYSQL_PASSWORD: ${ZBX_DB_PASSWORD}
+      MYSQL_DATABASE: ${ZBX_DB_NAME}
+      ZBX_SERVER_HOST: zabbix-server
+      PHP_TZ: ${ZBX_SERVER_TIMEZONE:-America/Sao_Paulo}
+    ports:
+      - "443:8443"
+    depends_on:
+      zabbix-server:
+        condition: service_healthy
+    networks:
+      - rathena-internal
+      - rathena-external
+    volumes:
+      - ./certs/zabbix.crt:/etc/ssl/nginx/ssl.crt:ro
+      - ./certs/zabbix.key:/etc/ssl/nginx/ssl.key:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsk https://localhost:8443/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 3
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 256M
+
+  # --------------------------------------------------------
+  # Zabbix Agent2 - Host metrics collector
+  # --------------------------------------------------------
+  zabbix-agent2:
+    image: zabbix/zabbix-agent2:7.0-ubuntu-latest
+    container_name: rathena-zabbix-agent2
+    environment:
+      ZBX_HOSTNAME: rathena-host
+      ZBX_SERVER_HOST: zabbix-server
+      ZBX_ACTIVE_ALLOW: "true"
+    depends_on:
+      zabbix-server:
+        condition: service_started
+    networks:
+      - rathena-internal
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 10050 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 3
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+
+  # --------------------------------------------------------
+  # Grafana - Dashboards and visualization (port 3000)
+  # --------------------------------------------------------
+  grafana:
+    image: grafana/grafana-oss:11.6.0
+    container_name: rathena-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GF_SECURITY_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD}
+      GF_SERVER_HTTP_PORT: "3000"
+      GF_INSTALL_PLUGINS: ${GF_INSTALL_PLUGINS:-alexanderzobnin-zabbix-app}
+    ports:
+      - "${GF_SERVER_HTTP_PORT:-3000}:3000"
+    depends_on:
+      zabbix-server:
+        condition: service_healthy
+    networks:
+      - rathena-internal
+      - rathena-external
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 3
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+  # --------------------------------------------------------
+  # Backup Service - Automated database backups
+  # --------------------------------------------------------
+  backup:
+    image: mariadb:11.4
+    container_name: rathena-backup
+    environment:
+      DB_HOST: mariadb
+      DB_PORT: "3306"
+      BACKUP_DB_USER: ${BACKUP_DB_USER}
+      BACKUP_DB_PASSWORD: ${BACKUP_DB_PASSWORD}
+      RATHENA_DB_NAME: ${RATHENA_DB_NAME}
+      RATHENA_LOG_DB_NAME: ${RATHENA_LOG_DB_NAME}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_WEBHOOK_URL: ${BACKUP_WEBHOOK_URL:-}
+      BACKUP_CRON_SCHEDULE: ${BACKUP_CRON_SCHEDULE:-0 4 * * *}
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    networks:
+      - rathena-internal
+    volumes:
+      - rathena-backups:/backups
+      - ./scripts/backup:/scripts:ro
+      - ./conf:/rathena/conf:ro
+      - ./npc/custom:/rathena/npc/custom:ro
+    entrypoint: ["/bin/bash", "/scripts/entrypoint.sh"]
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 256M
+
+  # --------------------------------------------------------
+  # FluxCP - Web Control Panel (port 80)
+  # --------------------------------------------------------
+  fluxcp:
+    build:
+      context: ./docker/fluxcp
+      dockerfile: Dockerfile
+    container_name: rathena-fluxcp
+    environment:
+      DB_HOST: mariadb
+      DB_PORT: "3306"
+      FLUXCP_DB_USER: ${FLUXCP_DB_USER}
+      FLUXCP_DB_PASSWORD: ${FLUXCP_DB_PASSWORD}
+      RATHENA_DB_NAME: ${RATHENA_DB_NAME}
+      SERVER_NAME: ${SERVER_NAME:-MyRO}
+      FLUXCP_BASE_URL: ${FLUXCP_BASE_URL:-http://localhost}
+    ports:
+      - "${FLUXCP_PORT:-80}:80"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    networks:
+      - rathena-internal
+      - rathena-external
+    volumes:
+      - fluxcp-data:/var/www/html/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:80/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 3
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+
+  # --------------------------------------------------------
+  # Autoheal - Automatic container recovery
+  # --------------------------------------------------------
+  autoheal:
+    image: willfarrell/autoheal:1.2.0
+    container_name: rathena-autoheal
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: ${AUTOHEAL_CONTAINER_LABEL:-all}
+      AUTOHEAL_INTERVAL: ${AUTOHEAL_INTERVAL:-5}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 64M
+        reservations:
+          cpus: "0.05"
+          memory: 32M

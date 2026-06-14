@@ -1,0 +1,129 @@
+# =============================================================================
+# Rollback Workflow
+# Reverts to a previous version of Docker images via commit SHA tag
+# Requirements: 4.8
+# =============================================================================
+name: Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: 'Target commit SHA (short) to rollback to. Leave empty to use previous commit.'
+        required: false
+        default: ''
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    name: Rollback rAthena Server
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.7
+        with:
+          fetch-depth: 2
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          cat >> ~/.ssh/config <<EOF
+          Host production
+            HostName ${{ secrets.SERVER_HOST }}
+            User ${{ secrets.SERVER_USER }}
+            IdentityFile ~/.ssh/deploy_key
+            StrictHostKeyChecking no
+            ServerAliveInterval 30
+            ServerAliveCountMax 5
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Determine rollback target
+        id: target
+        run: |
+          if [ -n "${{ inputs.target_sha }}" ]; then
+            TARGET="${{ inputs.target_sha }}"
+            echo "Using user-provided target SHA: ${TARGET}"
+          else
+            TARGET=$(git rev-parse --short HEAD~1)
+            echo "No target SHA provided. Using previous commit: ${TARGET}"
+          fi
+          echo "sha=${TARGET}" >> "$GITHUB_OUTPUT"
+          echo "Rollback target: sha-${TARGET}"
+
+      - name: Pull previous images from GHCR
+        run: |
+          TARGET_TAG="sha-${{ steps.target.outputs.sha }}"
+          echo "Pulling images tagged: ${TARGET_TAG}"
+
+          ssh production "docker pull ghcr.io/${{ github.repository_owner }}/rathena-login:${TARGET_TAG}"
+          ssh production "docker pull ghcr.io/${{ github.repository_owner }}/rathena-char:${TARGET_TAG}"
+          ssh production "docker pull ghcr.io/${{ github.repository_owner }}/rathena-map:${TARGET_TAG}"
+          ssh production "docker pull ghcr.io/${{ github.repository_owner }}/rathena-fluxcp:${TARGET_TAG}"
+
+          echo "All images pulled successfully."
+
+      - name: Recreate containers with rolled-back images
+        run: |
+          TARGET_TAG="sha-${{ steps.target.outputs.sha }}"
+          echo "Recreating containers with tag: ${TARGET_TAG}"
+
+          ssh production "cd /opt/rathena && \
+            IMAGE_TAG=${TARGET_TAG} docker compose up -d --force-recreate login-server char-server map-server fluxcp"
+
+          echo "Containers recreated with rolled-back images."
+
+      - name: Verify healthchecks
+        run: |
+          echo "Waiting for rolled-back services to become healthy..."
+          MAX_ATTEMPTS=30
+          SLEEP_INTERVAL=10
+          ATTEMPT=0
+
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "Health check attempt ${ATTEMPT}/${MAX_ATTEMPTS}..."
+
+            if ssh production "cd /opt/rathena && docker compose ps" 2>&1 | grep -q "unhealthy\|Exit"; then
+              echo "Some services are unhealthy or exited. Waiting..."
+            elif ssh production "cd /opt/rathena && docker compose ps" 2>&1 | grep -q "starting"; then
+              echo "Some services are still starting. Waiting..."
+            else
+              SERVICES_STATUS=$(ssh production "cd /opt/rathena && docker compose ps --format 'table {{.Name}}\t{{.Status}}'")
+              echo "All services are healthy after rollback!"
+              echo "${SERVICES_STATUS}"
+              exit 0
+            fi
+
+            if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+              echo "Sleeping ${SLEEP_INTERVAL}s before next check..."
+              sleep $SLEEP_INTERVAL
+            fi
+          done
+
+          echo "ERROR: Healthchecks did not pass within $((MAX_ATTEMPTS * SLEEP_INTERVAL)) seconds."
+          exit 1
+
+      - name: Output debug logs on failure
+        if: failure()
+        run: |
+          echo "=== Rollback failed. Collecting debug information... ==="
+          echo ""
+          echo "=== Container Status ==="
+          ssh production "cd /opt/rathena && docker compose ps" || true
+          echo ""
+          echo "=== Login Server Logs (last 50 lines) ==="
+          ssh production "cd /opt/rathena && docker compose logs --tail=50 login-server" || true
+          echo ""
+          echo "=== Char Server Logs (last 50 lines) ==="
+          ssh production "cd /opt/rathena && docker compose logs --tail=50 char-server" || true
+          echo ""
+          echo "=== Map Server Logs (last 50 lines) ==="
+          ssh production "cd /opt/rathena && docker compose logs --tail=50 map-server" || true

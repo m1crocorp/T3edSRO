@@ -1,0 +1,17 @@
+# =============================================================================
+# rAthena Backup Service - Default Crontab
+# =============================================================================
+# This is the default crontab schedule for the backup service.
+# The entrypoint.sh script uses BACKUP_CRON_SCHEDULE env var to override
+# this schedule at container startup.
+#
+# Default: daily at 04:00 UTC
+#
+# The /etc/environment file is sourced before executing the backup script
+# to ensure all container environment variables are available to the cron job,
+# since cron does not inherit the container's environment.
+#
+# Format: minute hour day month weekday command
+# =============================================================================
+0 4 * * * . /etc/environment; /scripts/backup.sh >> /var/log/backup.log 2>&1
+

@@ -1,0 +1,25 @@
+# Environment files (contain secrets)
+.env
+
+# TLS certificates (contain private keys)
+certs/*.crt
+certs/*.key
+certs/*.pem
+!certs/.gitkeep
+!certs/README.md
+
+# Docker volumes data (managed by Docker)
+data/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs (managed on host at /opt/rathena/logs/)
+*.log

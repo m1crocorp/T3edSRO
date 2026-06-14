@@ -1,0 +1,131 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to deploy (e.g., sha-abc123). Leave empty for latest.'
+        required: false
+        default: ''
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy rAthena Server
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.7
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          cat >> ~/.ssh/config <<EOF
+          Host production
+            HostName ${{ secrets.SERVER_HOST }}
+            User ${{ secrets.SERVER_USER }}
+            IdentityFile ~/.ssh/deploy_key
+            StrictHostKeyChecking no
+            ServerAliveInterval 30
+            ServerAliveCountMax 5
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Verify SSH connection
+        run: |
+          echo "Testing SSH connection to production server..."
+          ssh production "echo 'SSH connection successful' && hostname && uptime"
+
+      - name: Execute pre-deploy backup
+        run: |
+          echo "Running pre-deploy database backup..."
+          ssh production "cd /opt/rathena && docker compose exec -T backup /scripts/backup/backup.sh"
+          echo "Pre-deploy backup completed successfully."
+
+      - name: Pull new images
+        run: |
+          if [ -n "${{ inputs.image_tag }}" ]; then
+            echo "Pulling images with tag: ${{ inputs.image_tag }}"
+            ssh production "cd /opt/rathena && \
+              IMAGE_TAG=${{ inputs.image_tag }} docker compose pull"
+          else
+            echo "Pulling latest images..."
+            ssh production "cd /opt/rathena && docker compose pull"
+          fi
+
+      - name: Deploy - Recreate containers
+        run: |
+          echo "Deploying new containers..."
+          ssh production "cd /opt/rathena && docker compose up -d --force-recreate --remove-orphans"
+          echo "Containers recreated. Waiting for services to initialize..."
+
+      - name: Wait for healthchecks
+        run: |
+          echo "Waiting for all services to become healthy..."
+          MAX_ATTEMPTS=30
+          SLEEP_INTERVAL=10
+          ATTEMPT=0
+
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "Health check attempt ${ATTEMPT}/${MAX_ATTEMPTS}..."
+
+            # Get status of all services
+            HEALTH_OUTPUT=$(ssh production "cd /opt/rathena && docker compose ps --format json" 2>&1) || true
+
+            # Check if any service is unhealthy or starting
+            UNHEALTHY=$(ssh production "cd /opt/rathena && docker compose ps | grep -E '(unhealthy|starting|Exit)'" 2>&1) || true
+            ALL_HEALTHY=$(ssh production "cd /opt/rathena && docker compose ps --status running | grep -c 'running'" 2>&1) || true
+
+            # Verify all services with healthchecks report healthy
+            NOT_HEALTHY=$(ssh production "cd /opt/rathena && docker compose ps | grep -v 'healthy\|running' | grep -v 'NAME\|^$'" 2>&1) || true
+
+            if ssh production "cd /opt/rathena && docker compose ps" 2>&1 | grep -q "unhealthy\|Exit"; then
+              echo "Some services are unhealthy or exited. Waiting..."
+            elif ssh production "cd /opt/rathena && docker compose ps" 2>&1 | grep -q "starting"; then
+              echo "Some services are still starting. Waiting..."
+            else
+              # All services are running and healthy
+              SERVICES_STATUS=$(ssh production "cd /opt/rathena && docker compose ps --format 'table {{.Name}}\t{{.Status}}'")
+              echo "All services are healthy!"
+              echo "${SERVICES_STATUS}"
+              exit 0
+            fi
+
+            if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+              echo "Sleeping ${SLEEP_INTERVAL}s before next check..."
+              sleep $SLEEP_INTERVAL
+            fi
+          done
+
+          echo "ERROR: Healthchecks did not pass within $((MAX_ATTEMPTS * SLEEP_INTERVAL)) seconds."
+          exit 1
+
+      - name: Output debug logs on failure
+        if: failure()
+        run: |
+          echo "=== Deploy failed. Collecting debug information... ==="
+          echo ""
+          echo "=== Container Status ==="
+          ssh production "cd /opt/rathena && docker compose ps" || true
+          echo ""
+          echo "=== Login Server Logs (last 50 lines) ==="
+          ssh production "cd /opt/rathena && docker compose logs --tail=50 login-server" || true
+          echo ""
+          echo "=== Char Server Logs (last 50 lines) ==="
+          ssh production "cd /opt/rathena && docker compose logs --tail=50 char-server" || true
+          echo ""
+          echo "=== Map Server Logs (last 50 lines) ==="
+          ssh production "cd /opt/rathena && docker compose logs --tail=50 map-server" || true
+          echo ""
+          echo "=== MariaDB Logs (last 50 lines) ==="
+          ssh production "cd /opt/rathena && docker compose logs --tail=50 mariadb" || true
+          echo ""
+          echo "=== FluxCP Logs (last 50 lines) ==="
+          ssh production "cd /opt/rathena && docker compose logs --tail=50 fluxcp" || true

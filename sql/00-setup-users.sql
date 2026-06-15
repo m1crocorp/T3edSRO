@@ -21,7 +21,8 @@
 DROP DATABASE IF EXISTS test;
 DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
 DELETE FROM mysql.global_priv WHERE User='';
-DELETE FROM mysql.global_priv WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
+-- Keep root@'%' for inter-container access (required by Zabbix Server init)
+-- DELETE FROM mysql.global_priv WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
 
 -- -----------------------------------------------------------------------------
 -- Criar bancos de dados (Req 3.3)

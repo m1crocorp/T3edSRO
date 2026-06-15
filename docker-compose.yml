@@ -320,7 +320,7 @@ services:
     volumes:
       - zabbix-server-data:/var/lib/zabbix
     healthcheck:
-      test: ["CMD-SHELL", "nc -z localhost 10051 || exit 1"]
+      test: ["CMD-SHELL", "pidof zabbix_server || exit 1"]
       interval: 30s
       timeout: 10s
       start_period: 120s
@@ -404,7 +404,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     healthcheck:
-      test: ["CMD-SHELL", "nc -z localhost 10050 || exit 1"]
+      test: ["CMD-SHELL", "pidof zabbix_agent2 || exit 1"]
       interval: 30s
       timeout: 10s
       start_period: 120s

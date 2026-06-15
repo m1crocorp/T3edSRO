@@ -50,29 +50,10 @@ EOF
 chmod 0600 /etc/environment
 
 # ---------------------------------------------------------------------------
-# Step 2: Install crontab
-# Use BACKUP_CRON_SCHEDULE env var if set, otherwise default to 04:00 UTC.
-# The cron job sources /etc/environment before running the backup script to
-# ensure all required variables are available.
+# Step 2: Create log file and ensure backup directory exists
 # ---------------------------------------------------------------------------
 CRON_SCHEDULE="${BACKUP_CRON_SCHEDULE:-0 4 * * *}"
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Installing crontab with schedule: ${CRON_SCHEDULE}"
-
-# Generate crontab dynamically with the configured schedule
-# The '. /etc/environment' sources all env vars before executing backup.sh
-cat > /etc/cron.d/rathena-backup <<EOF
-# rAthena Backup - schedule: ${CRON_SCHEDULE}
-${CRON_SCHEDULE} root . /etc/environment; /scripts/backup.sh >> /var/log/backup.log 2>&1
-# Empty line required by cron
-EOF
-
-# Set proper permissions (cron requires 0644 for files in /etc/cron.d)
-chmod 0644 /etc/cron.d/rathena-backup
-
-# ---------------------------------------------------------------------------
-# Step 3: Create log file and ensure backup directory exists
-# ---------------------------------------------------------------------------
 touch /var/log/backup.log
 mkdir -p /backups
 
@@ -82,9 +63,46 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Backup target: /backups/"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Database: ${DB_HOST:-mariadb}:${DB_PORT:-3306}"
 
 # ---------------------------------------------------------------------------
-# Step 4: Start cron in foreground
-# The -f flag keeps cron in the foreground so Docker can track the process.
-# This ensures the container stays running and Docker can detect if cron dies.
+# Step 3: Run backup loop using sleep (no cron dependency)
+# Calculates seconds until next scheduled run (default 04:00 UTC daily).
 # ---------------------------------------------------------------------------
-exec cron -f
+calculate_seconds_until_next_run() {
+    local target_hour="${BACKUP_HOUR:-4}"
+    local target_min="${BACKUP_MIN:-0}"
+    local now_epoch now_hour now_min target_epoch
+
+    now_epoch=$(date +%s)
+    now_hour=$(date -u +%H | sed 's/^0//')
+    now_min=$(date -u +%M | sed 's/^0//')
+
+    # Calculate target epoch for today
+    target_epoch=$(date -u -d "$(date -u +%Y-%m-%d) ${target_hour}:${target_min}:00" +%s 2>/dev/null || echo "0")
+
+    if [ "$target_epoch" -le "$now_epoch" ]; then
+        # Target already passed today, schedule for tomorrow
+        target_epoch=$((target_epoch + 86400))
+    fi
+
+    echo $((target_epoch - now_epoch))
+}
+
+# Parse hour/min from BACKUP_CRON_SCHEDULE (format: "MIN HOUR * * *")
+BACKUP_MIN=$(echo "${CRON_SCHEDULE}" | awk '{print $1}')
+BACKUP_HOUR=$(echo "${CRON_SCHEDULE}" | awk '{print $2}')
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Backup will run daily at ${BACKUP_HOUR}:$(printf '%02d' ${BACKUP_MIN}) UTC"
+
+while true; do
+    SLEEP_SECONDS=$(calculate_seconds_until_next_run)
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Next backup in ${SLEEP_SECONDS} seconds ($(date -u -d @$(($(date +%s) + SLEEP_SECONDS)) '+%Y-%m-%d %H:%M UTC' 2>/dev/null || echo 'soon'))"
+    sleep "${SLEEP_SECONDS}"
+
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting scheduled backup..."
+    . /etc/environment
+    /scripts/backup.sh >> /var/log/backup.log 2>&1 || true
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Backup cycle complete."
+
+    # Sleep 60s to avoid re-triggering in the same minute
+    sleep 60
+done
 

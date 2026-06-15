@@ -150,7 +150,10 @@ PHPEOF
 # ============================================================
 configure_db_check() {
     local php_ini_dir
-    php_ini_dir="$(php -r 'echo php_ini_loaded_file();' | xargs dirname)"
+    php_ini_dir="$(php -r 'echo PHP_INI_DIR;' 2>/dev/null || echo '/usr/local/etc/php')"
+
+    # Ensure conf.d directory exists
+    mkdir -p "${php_ini_dir}/conf.d"
 
     # Create a custom ini that prepends the DB check script
     cat > "${php_ini_dir}/conf.d/99-fluxcp-dbcheck.ini" << INIEOF

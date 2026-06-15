@@ -56,7 +56,8 @@ GRANT SELECT, LOCK TABLES, SHOW VIEW, EVENT, TRIGGER ON `ragnarok_log`.* TO 'rat
 -- Privilégios: SELECT, INSERT, UPDATE, DELETE apenas no banco ragnarok
 -- -----------------------------------------------------------------------------
 CREATE USER IF NOT EXISTS 'fluxcp'@'%' IDENTIFIED BY '${FLUXCP_DB_PASSWORD}';
-GRANT SELECT, INSERT, UPDATE, DELETE ON `ragnarok`.* TO 'fluxcp'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE TEMPORARY TABLES ON `ragnarok`.* TO 'fluxcp'@'%';
+GRANT SELECT ON `ragnarok_log`.* TO 'fluxcp'@'%';
 
 -- -----------------------------------------------------------------------------
 -- Usuário: zabbix (Req 5.11)

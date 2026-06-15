@@ -3,29 +3,27 @@ set -e
 
 # =============================================================================
 # rAthena Login Server Entrypoint
-# Generates configuration files from templates using environment variables
-# and starts the login-server process.
+# Generates configuration overrides from templates using environment variables.
 #
-# Templates: /rathena/conf/templates/ (read-only volume)
-# Output:    /rathena/conf/import/ (rAthena reads import/ directory for overrides)
+# rAthena reads conf/inter_athena.conf which imports conf/import/inter_conf.txt
+# and conf/login_athena.conf which imports conf/import/login_conf.txt
+# We generate these import files with values from environment variables.
 # =============================================================================
 
 IMPORT_DIR="/rathena/conf/import"
 
-# Create import directory (rAthena loads configs from conf/import/ as overrides)
 mkdir -p "${IMPORT_DIR}"
 
 echo "[entrypoint-login] Generating configuration files from templates..."
 
-# Generate inter_athena.conf
-envsubst < /rathena/conf/templates/inter_athena.conf.tmpl > "${IMPORT_DIR}/inter_athena.conf"
-echo "[entrypoint-login] Generated: inter_athena.conf"
+# Generate inter_conf.txt (database connection overrides)
+envsubst < /rathena/conf/templates/inter_athena.conf.tmpl > "${IMPORT_DIR}/inter_conf.txt"
+echo "[entrypoint-login] Generated: inter_conf.txt"
 
-# Generate login_athena.conf
-envsubst < /rathena/conf/templates/login_athena.conf.tmpl > "${IMPORT_DIR}/login_athena.conf"
-echo "[entrypoint-login] Generated: login_athena.conf"
+# Generate login_conf.txt (login server overrides)
+envsubst < /rathena/conf/templates/login_athena.conf.tmpl > "${IMPORT_DIR}/login_conf.txt"
+echo "[entrypoint-login] Generated: login_conf.txt"
 
 echo "[entrypoint-login] Configuration generation complete. Starting login-server..."
 
-# rAthena reads configs from ./conf/ relative to binary (no --conf flag)
 exec ./login-server

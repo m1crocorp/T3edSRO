@@ -230,7 +230,7 @@ return array(
             'Persistent' => true
         ),
         'LoginServer'  => array(
-            'Address'  => '${DB_HOST}',
+            'Address'  => 'rathena-login',
             'Port'     => 6900,
             'UseMD5'   => false,
             'NoCase'   => true,
@@ -256,8 +256,8 @@ return array(
                     'Card' => 100, 'CardBoss' => 100, 'CardMVP' => 100, 'CardMin' => 1, 'CardMax' => 10000,
                     'MvpItem' => 100, 'MvpItemMin' => 1, 'MvpItemMax' => 10000, 'MvpItemMode' => 0
                 ),
-                'CharServer'   => array('Address' => '${DB_HOST}', 'Port' => 6121),
-                'MapServer'    => array('Address' => '${DB_HOST}', 'Port' => 5121),
+                'CharServer'   => array('Address' => 'rathena-char', 'Port' => 6121),
+                'MapServer'    => array('Address' => 'rathena-map', 'Port' => 5121),
                 'WoeDayTimes'  => array(),
                 'WoeDisallow'  => array()
             )

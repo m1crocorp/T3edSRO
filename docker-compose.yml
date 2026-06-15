@@ -58,6 +58,7 @@ services:
     container_name: rathena-mariadb
     environment:
       MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+      MARIADB_ROOT_HOST: '%'
       RATHENA_DB_USER: ${RATHENA_DB_USER}
       RATHENA_DB_PASSWORD: ${RATHENA_DB_PASSWORD}
       RATHENA_DB_NAME: ${RATHENA_DB_NAME}
@@ -142,7 +143,7 @@ services:
     tmpfs:
       - /tmp
       - /run
-      - /rathena/conf/generated:uid=1000,gid=1000
+      - /rathena/conf/import:uid=1000,gid=1000
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -212,7 +213,7 @@ services:
     tmpfs:
       - /tmp
       - /run
-      - /rathena/conf/generated:uid=1000,gid=1000
+      - /rathena/conf/import:uid=1000,gid=1000
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -278,7 +279,7 @@ services:
     tmpfs:
       - /tmp
       - /run
-      - /rathena/conf/generated:uid=1000,gid=1000
+      - /rathena/conf/import:uid=1000,gid=1000
     security_opt:
       - no-new-privileges:true
     cap_drop:

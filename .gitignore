@@ -23,3 +23,7 @@ Thumbs.db
 
 # Logs (managed on host at /opt/rathena/logs/)
 *.log
+
+# rAthena SQL schemas (downloaded from upstream, not versioned)
+sql/main.sql
+sql/logs.sql

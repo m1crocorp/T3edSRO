@@ -152,23 +152,27 @@ apply_rathena_schemas() {
     log_info "Aplicando schemas oficiais do rAthena..."
 
     # Schema principal (tabelas do jogo: login, char_, inventory, guild, etc.)
-    if download_schema "main.sql"; then
+    local main_sql="${SQL_DIR}/main.sql"
+    if [[ -f "${main_sql}" ]]; then
         log_info "Executando main.sql no banco 'ragnarok'..."
-        mariadb -u root -p"${MARIADB_ROOT_PASSWORD}" ragnarok < "${SQL_DIR}/main.sql"
+        mariadb -u root -p"${MARIADB_ROOT_PASSWORD}" ragnarok < "${main_sql}"
         log_info "main.sql aplicado com sucesso."
     else
-        log_warn "Não foi possível obter main.sql. O banco será criado vazio."
-        log_warn "Execute manualmente: mariadb ragnarok < main.sql"
+        log_warn "Arquivo main.sql não encontrado em ${main_sql}."
+        log_warn "Baixe de: https://raw.githubusercontent.com/rathena/rathena/master/sql-files/main.sql"
+        log_warn "E coloque em sql/main.sql antes de iniciar."
     fi
 
     # Schema de logs (tabelas de auditoria: loginlog, picklog, zenylog, etc.)
-    if download_schema "logs.sql"; then
+    local logs_sql="${SQL_DIR}/logs.sql"
+    if [[ -f "${logs_sql}" ]]; then
         log_info "Executando logs.sql no banco 'ragnarok_log'..."
-        mariadb -u root -p"${MARIADB_ROOT_PASSWORD}" ragnarok_log < "${SQL_DIR}/logs.sql"
+        mariadb -u root -p"${MARIADB_ROOT_PASSWORD}" ragnarok_log < "${logs_sql}"
         log_info "logs.sql aplicado com sucesso."
     else
-        log_warn "Não foi possível obter logs.sql. O banco de logs será criado vazio."
-        log_warn "Execute manualmente: mariadb ragnarok_log < logs.sql"
+        log_warn "Arquivo logs.sql não encontrado em ${logs_sql}."
+        log_warn "Baixe de: https://raw.githubusercontent.com/rathena/rathena/master/sql-files/logs.sql"
+        log_warn "E coloque em sql/logs.sql antes de iniciar."
     fi
 }
 

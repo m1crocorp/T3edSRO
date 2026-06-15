@@ -55,8 +55,11 @@ RUN sed -i 's|DocumentRoot /var/www/html|DocumentRoot /var/www/html/fluxcp|g' \
 
 # Create data directory for persistent uploads/configs (Requirement 13.6)
 # The volume is mounted at /var/www/html/data via docker-compose
-# Symlink FluxCP's expected data path to the volume mount point
-RUN mkdir -p /var/www/html/data \
+# Copy FluxCP's original data directory (schemas, etc.) to a default location,
+# then symlink FluxCP's data path to the volume mount point.
+# The entrypoint will copy defaults to volume on first run.
+RUN mkdir -p /var/www/html/data /var/www/html/fluxcp-data-default \
+    && cp -a /var/www/html/fluxcp/data/. /var/www/html/fluxcp-data-default/ \
     && rm -rf /var/www/html/fluxcp/data \
     && ln -s /var/www/html/data /var/www/html/fluxcp/data
 

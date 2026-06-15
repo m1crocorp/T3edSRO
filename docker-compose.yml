@@ -54,7 +54,7 @@ services:
   mariadb:
     image: mariadb:11.4
     container_name: rathena-mariadb
-    entrypoint: /usr/local/bin/mariadb-entrypoint-wrapper.sh
+    entrypoint: ["bash", "/usr/local/bin/mariadb-entrypoint-wrapper.sh"]
     environment:
       MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
       RATHENA_DB_USER: ${RATHENA_DB_USER}

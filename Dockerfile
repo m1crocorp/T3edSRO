@@ -37,6 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zlib1g \
     libpcre3 \
     netcat-openbsd \
+    gettext-base \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g 1000 rathena && useradd -u 1000 -g rathena -m rathena
@@ -46,7 +47,8 @@ COPY --from=builder /src/login-server ./
 COPY --from=builder /src/conf ./conf
 COPY --from=builder /src/db ./db
 COPY docker/entrypoint-login.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh && chown -R rathena:rathena /rathena
+RUN mkdir -p /rathena/conf/generated && \
+    chmod +x /entrypoint.sh && chown -R rathena:rathena /rathena
 
 USER rathena
 EXPOSE 6900
@@ -65,6 +67,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zlib1g \
     libpcre3 \
     netcat-openbsd \
+    gettext-base \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g 1000 rathena && useradd -u 1000 -g rathena -m rathena
@@ -74,7 +77,8 @@ COPY --from=builder /src/char-server ./
 COPY --from=builder /src/conf ./conf
 COPY --from=builder /src/db ./db
 COPY docker/entrypoint-char.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh && chown -R rathena:rathena /rathena
+RUN mkdir -p /rathena/conf/generated && \
+    chmod +x /entrypoint.sh && chown -R rathena:rathena /rathena
 
 USER rathena
 EXPOSE 6121
@@ -94,6 +98,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zlib1g \
     libpcre3 \
     netcat-openbsd \
+    gettext-base \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g 1000 rathena && useradd -u 1000 -g rathena -m rathena
@@ -104,7 +109,8 @@ COPY --from=builder /src/conf ./conf
 COPY --from=builder /src/db ./db
 COPY --from=builder /src/npc ./npc
 COPY docker/entrypoint-map.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh && chown -R rathena:rathena /rathena
+RUN mkdir -p /rathena/conf/generated && \
+    chmod +x /entrypoint.sh && chown -R rathena:rathena /rathena
 
 USER rathena
 EXPOSE 5121

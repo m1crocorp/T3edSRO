@@ -142,7 +142,7 @@ services:
     tmpfs:
       - /tmp
       - /run
-      - /rathena/conf/generated
+      - /rathena/conf/generated:uid=1000,gid=1000
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -212,7 +212,7 @@ services:
     tmpfs:
       - /tmp
       - /run
-      - /rathena/conf/generated
+      - /rathena/conf/generated:uid=1000,gid=1000
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -278,7 +278,7 @@ services:
     tmpfs:
       - /tmp
       - /run
-      - /rathena/conf/generated
+      - /rathena/conf/generated:uid=1000,gid=1000
     security_opt:
       - no-new-privileges:true
     cap_drop:

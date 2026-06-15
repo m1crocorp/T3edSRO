@@ -40,7 +40,7 @@ Manual → rollback.yml (revert para tag anterior)
 | Build char-server | `docker build --target char-server` |
 | Build map-server | `docker build --target map-server` |
 | Build fluxcp | `docker build -f docker/fluxcp/Dockerfile` |
-| Tag | `ghcr.io/org/rathena-login:sha-abc1234` (SHA curto) |
+| Tag | `ghcr.io/m1crocorp/rathena-login:sha-abc1234` (SHA curto) |
 | Push | Push para GitHub Container Registry |
 
 **Tagging**: Cada imagem recebe tag com SHA curto do commit (`sha-<7 chars>`), garantindo rastreabilidade e facilitando rollback.
@@ -138,10 +138,10 @@ echo $GHCR_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
 
 | Imagem | Descrição |
 |--------|-----------|
-| `ghcr.io/org/rathena-login:<sha>` | Login Server |
-| `ghcr.io/org/rathena-char:<sha>` | Char Server |
-| `ghcr.io/org/rathena-map:<sha>` | Map Server |
-| `ghcr.io/org/rathena-fluxcp:<sha>` | FluxCP Panel |
+| `ghcr.io/m1crocorp/rathena-login:<sha>` | Login Server |
+| `ghcr.io/m1crocorp/rathena-char:<sha>` | Char Server |
+| `ghcr.io/m1crocorp/rathena-map:<sha>` | Map Server |
+| `ghcr.io/m1crocorp/rathena-fluxcp:<sha>` | FluxCP Panel |
 
 ### Listar tags disponíveis
 

@@ -48,8 +48,8 @@ Provisionar e iniciar um servidor rAthena de produção em uma máquina Ubuntu 2
 ### 1. Clonar o repositório
 
 ```bash
-git clone https://github.com/seu-org/rathena-infra.git
-cd rathena-infra
+git clone https://github.com/m1crocorp/T3edSRO.git
+cd T3edSRO
 ```
 
 ### 2. Executar provisionamento do host

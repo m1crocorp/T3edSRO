@@ -51,8 +51,8 @@ apt install -y git
 
 ```bash
 cd /opt
-git clone https://github.com/seu-org/rathena-infra.git
-cd rathena-infra
+git clone https://github.com/m1crocorp/T3edSRO.git
+cd T3edSRO
 ```
 
 ### 3. Executar provisionamento

@@ -43,8 +43,8 @@ Siga os passos abaixo em um servidor Ubuntu 24.04 LTS limpo com acesso root ou s
 
 ```bash
 # 1. Clonar o repositório
-git clone https://github.com/seu-org/rathena-infra.git
-cd rathena-infra
+git clone https://github.com/m1crocorp/T3edSRO.git
+cd T3edSRO
 
 # 2. Executar provisionamento do host (instala Docker, UFW, fail2ban, unattended-upgrades)
 sudo bash scripts/setup.sh

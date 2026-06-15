@@ -72,7 +72,7 @@ services:
     volumes:
       - rathena-db-data:/var/lib/mysql
       - ./sql:/docker-entrypoint-initdb.d:ro
-      - ./db/conf.d:/etc/mysql/conf.d:ro
+      - ./db/conf.d:/etc/mysql/conf.d.ro:ro
     networks:
       - rathena-internal
     healthcheck:

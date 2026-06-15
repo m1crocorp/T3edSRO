@@ -303,9 +303,9 @@ docker compose logs mariadb --tail 50
 
 ```bash
 # Verificar healthcheck manualmente
-docker compose exec login-server nc -z localhost 6900
+docker compose exec login-server pidof login-server
 
 # Se o binário não responde:
 docker compose exec login-server ls -la /rathena/
-docker compose exec login-server cat /rathena/conf/generated/login_athena.conf
+docker compose exec login-server cat /rathena/conf/import/login_athena.conf
 ```

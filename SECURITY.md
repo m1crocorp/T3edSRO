@@ -95,7 +95,7 @@ net.ipv6.conf.all.disable_ipv6 = 1  # Se IPv6 não utilizado
 |----------|-------------|-----------|
 | Non-root | `USER rathena` (UID 1000) | Sem privilégios de root |
 | Read-only FS | `read_only: true` | Previne escrita maliciosa |
-| tmpfs | `/tmp`, `/run`, `/rathena/conf/generated` | Áreas de escrita temporária |
+| tmpfs | `/tmp`, `/run`, `/rathena/conf/import` | Áreas de escrita temporária |
 | No new privileges | `security_opt: no-new-privileges:true` | Impede escalação |
 | Cap drop | `cap_drop: ALL` | Remove todas as capabilities |
 | Resource limits | `deploy.resources.limits` | Previne resource exhaustion |

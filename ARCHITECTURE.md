@@ -36,7 +36,7 @@ A infraestrutura segue uma arquitetura single-host containerizada com isolamento
 | Monitoramento | Zabbix 7.0 LTS + Grafana 11 | Enterprise-grade, templates prontos, alertas nativos com webhook |
 | Web Panel | FluxCP (PHP 8.2 + Apache) | Painel oficial da comunidade rAthena |
 | CI/CD | GitHub Actions | Integração nativa com GHCR, sem custo para repos públicos |
-| Backup | Container dedicado com cron | Isolamento de responsabilidade, agendamento simples |
+| Backup | Container dedicado com sleep loop scheduler | Isolamento de responsabilidade, agendamento simples |
 | Auto-recovery | Autoheal + restart policy | Reinício automático de containers unhealthy |
 
 ## Componentes
@@ -81,7 +81,7 @@ MariaDB 11.4 LTS em container dedicado na rede interna (sem port binding no host
 
 ### Backup
 
-Container dedicado com cron (04:00 UTC diário):
+Container dedicado com sleep loop scheduler (04:00 UTC diário):
 - `mariadb-dump` com `--single-transaction --routines --triggers --events`
 - Compressão gzip, retenção 30 dias, rotação automática
 - Backup separado de configurações (conf/ + npc/custom/)

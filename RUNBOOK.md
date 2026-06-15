@@ -6,7 +6,7 @@
 
 | Sintoma | Severidade | Possíveis Causas | Diagnóstico | Ação |
 |---------|-----------|------------------|-------------|------|
-| Jogadores não conseguem logar | Disaster | Login Server down, MariaDB down, firewall bloqueando | `docker compose ps`, `nc -z <ip> 6900` | Reiniciar login-server, verificar MariaDB |
+| Jogadores não conseguem logar | Disaster | Login Server down, MariaDB down, firewall bloqueando | `docker compose ps login-server` | Reiniciar login-server, verificar MariaDB |
 | Jogadores desconectam em massa | Disaster | Map Server crash, rede instável, DDoS | `docker compose logs map-server`, `iftop` | Verificar logs, rate limiting, reiniciar se necessário |
 | Lag excessivo no jogo | High | Map Server com CPU/RAM saturada, slow queries | `docker stats`, `docker compose logs map-server \| grep tick` | Verificar recursos, otimizar DB, reiniciar |
 | Personagens não carregam | High | Char Server down, erro de banco | `docker compose ps char-server`, logs | Reiniciar char-server, verificar DB |
@@ -35,7 +35,7 @@ docker compose restart mariadb
 # Aguardar healthy, login-server iniciará automaticamente
 
 # 2. Configuração inválida → verificar templates
-docker compose exec login-server cat /rathena/conf/generated/login_athena.conf
+docker compose exec login-server cat /rathena/conf/import/login_athena.conf
 
 # 3. Binário corrompido → rebuild da imagem
 docker compose build login-server
@@ -65,8 +65,8 @@ sudo iptables -L -n | grep hashlimit
 # Verificar logs de login
 docker compose logs login-server --tail 100 | grep -i "auth\|login\|failed"
 
-# Verificar conexão com banco
-docker compose exec login-server nc -z mariadb 3306
+# Verificar conexão com banco (via MariaDB diretamente)
+docker compose exec mariadb mariadb -u root -p -e "SELECT 1;"
 
 # Verificar se a conta existe no banco
 docker compose exec mariadb mariadb -u root -p -e \
@@ -77,10 +77,10 @@ docker compose exec mariadb mariadb -u root -p -e \
 
 ```bash
 # Verificar se MariaDB está acessível da rede interna
-docker compose exec login-server nc -z mariadb 3306
+docker compose exec mariadb mariadb -u root -p -e "SELECT 1;"
 
 # Verificar credenciais no config gerado
-docker compose exec login-server cat /rathena/conf/generated/inter_athena.conf | grep -i "sql"
+docker compose exec login-server cat /rathena/conf/import/inter_athena.conf | grep -i "sql"
 
 # Verificar logs do MariaDB
 docker compose logs mariadb --tail 30
@@ -98,8 +98,8 @@ docker compose exec mariadb mariadb -u rathena -p -e "SELECT 1;"
 docker compose ps login-server
 
 # Verificar Inter_Server_Password
-docker compose exec char-server cat /rathena/conf/generated/inter_athena.conf | grep "passwd"
-docker compose exec login-server cat /rathena/conf/generated/inter_athena.conf | grep "passwd"
+docker compose exec char-server cat /rathena/conf/import/inter_athena.conf | grep "passwd"
+docker compose exec login-server cat /rathena/conf/import/inter_athena.conf | grep "passwd"
 # Ambos devem ter o mesmo valor
 
 # Verificar logs de conexão
@@ -148,7 +148,7 @@ docker compose logs char-server | grep -i "auth.*fail"
 # Verificar se todas as configs estão consistentes
 for svc in login-server char-server map-server; do
     echo "=== $svc ==="
-    docker compose exec $svc cat /rathena/conf/generated/inter_athena.conf | grep "passwd"
+    docker compose exec $svc cat /rathena/conf/import/inter_athena.conf | grep "passwd"
 done
 
 # Solução: corrigir no .env e reiniciar
@@ -510,9 +510,9 @@ docker compose ps
 docker inspect --format='{{json .State.Health}}' rathena-infra-login-server-1 | jq .
 
 # Testar healthcheck manualmente
-docker compose exec login-server nc -z localhost 6900
-docker compose exec char-server nc -z localhost 6121
-docker compose exec map-server nc -z localhost 5121
+docker compose exec login-server pidof login-server
+docker compose exec char-server pidof char-server
+docker compose exec map-server pidof map-server
 docker compose exec mariadb healthcheck.sh --connect --innodb_initialized
 
 # Verificar autoheal

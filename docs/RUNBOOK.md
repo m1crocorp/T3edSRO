@@ -11,7 +11,7 @@
 
 | Sintoma | Severidade | Causas Possíveis | Diagnóstico | Ação |
 |---------|-----------|------------------|-------------|------|
-| Jogadores não conseguem logar | **Disaster** | Login Server down, MariaDB down, firewall bloqueando porta 6900 | `docker compose ps login-server`, `nc -z localhost 6900`, `sudo ufw status` | Reiniciar login-server; verificar MariaDB; verificar UFW |
+| Jogadores não conseguem logar | **Disaster** | Login Server down, MariaDB down, firewall bloqueando porta 6900 | `docker compose ps login-server`, `docker compose ps login-server`, `sudo ufw status` | Reiniciar login-server; verificar MariaDB; verificar UFW |
 | Jogadores desconectam em massa | **Disaster** | Map Server crash, rede instável, ataque DDoS | `docker compose logs map-server --tail 50`, `ss -s`, `iptables -L -n -v` | Verificar logs crash; verificar rate limiting; reiniciar map-server |
 | Lag excessivo no jogo | **High** | Map Server com CPU/RAM saturada, slow queries, NPC scripts pesados | `docker stats map-server`, `docker compose logs map-server \| grep tick` | Verificar recursos; otimizar DB; reiniciar map-server |
 | Personagens não carregam | **High** | Char Server down, tabelas corrompidas, MariaDB lento | `docker compose ps char-server`, `docker compose logs char-server` | Reiniciar char-server; CHECK TABLE; verificar DB |
@@ -49,8 +49,8 @@ docker compose ps mariadb
 # Se mariadb não está healthy, resolver MariaDB primeiro
 
 # 3. Verificar se configuração foi gerada corretamente
-docker compose run --rm login-server cat /rathena/conf/generated/login_athena.conf
-docker compose run --rm login-server cat /rathena/conf/generated/inter_athena.conf
+docker compose run --rm login-server cat /rathena/conf/import/login_athena.conf
+docker compose run --rm login-server cat /rathena/conf/import/inter_athena.conf
 
 # 4. Verificar variáveis de ambiente
 docker compose config login-server | grep -A20 "environment"
@@ -70,7 +70,7 @@ docker compose run --rm login-server ls -la /rathena/login-server
 
 #### Cenário 2: Recusa conexões na porta 6900
 
-**Sintomas:** Jogadores recebem "Unable to connect to server"; `nc -z localhost 6900` falha
+**Sintomas:** Jogadores recebem "Unable to connect to server"; `docker compose ps login-server` falha
 
 ```bash
 # 1. Verificar se o processo login-server está rodando dentro do container
@@ -109,7 +109,7 @@ sudo iptables -L -n | grep hashlimit
 docker compose logs login-server --tail 100 | grep -i "auth\|login\|reject\|failed\|banned"
 
 # 2. Verificar conexão do login-server com MariaDB
-docker compose exec login-server nc -z mariadb 3306
+docker compose exec mariadb mariadb -u root -p -e "SELECT 1;"
 echo $?  # 0 = ok
 
 # 3. Verificar se conta existe e está desbloqueada
@@ -138,11 +138,11 @@ docker compose exec mariadb mariadb -u root -p${MYSQL_ROOT_PASSWORD} -e \
 
 ```bash
 # 1. Verificar se MariaDB está acessível da rede interna
-docker compose exec login-server nc -z mariadb 3306
+docker compose exec mariadb mariadb -u root -p -e "SELECT 1;"
 # Se falha: MariaDB não está na mesma rede ou está down
 
 # 2. Verificar credenciais no config gerado
-docker compose exec login-server cat /rathena/conf/generated/inter_athena.conf | grep -E "sql\.(db|login|passwd)"
+docker compose exec login-server cat /rathena/conf/import/inter_athena.conf | grep -E "sql\.(db|login|passwd)"
 
 # 3. Verificar logs do MariaDB
 docker compose logs mariadb --tail 30
@@ -179,14 +179,14 @@ docker compose ps login-server
 # Deve estar "healthy"
 
 # 2. Verificar conectividade de rede entre containers
-docker compose exec char-server nc -z login-server 6900
+docker compose exec char-server pidof char-server
 # Se falha: problema de rede Docker
 
 # 3. Verificar Inter_Server_Password em ambos os serviços
 echo "=== Login Server ==="
-docker compose exec login-server cat /rathena/conf/generated/inter_athena.conf | grep "passwd"
+docker compose exec login-server cat /rathena/conf/import/inter_athena.conf | grep "passwd"
 echo "=== Char Server ==="
-docker compose exec char-server cat /rathena/conf/generated/inter_athena.conf | grep "passwd"
+docker compose exec char-server cat /rathena/conf/import/inter_athena.conf | grep "passwd"
 # Ambos DEVEM ter o mesmo valor
 
 # 4. Verificar logs detalhados
@@ -282,7 +282,7 @@ docker compose logs char-server --tail 20 | grep -i "auth.*fail\|password\|rejec
 # 2. Comparar senha em TODOS os serviços (devem ser idênticas)
 for svc in login-server char-server map-server; do
     echo "=== $svc ==="
-    docker compose exec $svc cat /rathena/conf/generated/inter_athena.conf | grep "passwd"
+    docker compose exec $svc cat /rathena/conf/import/inter_athena.conf | grep "passwd"
 done
 
 # 3. Verificar o valor no .env
@@ -1092,9 +1092,9 @@ docker inspect --format='{{json .State.Health}}' $(docker compose ps -q map-serv
 docker inspect --format='{{json .State.Health}}' $(docker compose ps -q mariadb) | jq .
 
 # Testar healthchecks manualmente
-docker compose exec login-server nc -z localhost 6900 && echo "OK" || echo "FAIL"
-docker compose exec char-server nc -z localhost 6121 && echo "OK" || echo "FAIL"
-docker compose exec map-server nc -z localhost 5121 && echo "OK" || echo "FAIL"
+docker compose exec login-server pidof login-server && echo "OK" || echo "FAIL"
+docker compose exec char-server pidof char-server && echo "OK" || echo "FAIL"
+docker compose exec map-server pidof map-server && echo "OK" || echo "FAIL"
 docker compose exec mariadb healthcheck.sh --connect --innodb_initialized && echo "OK" || echo "FAIL"
 
 # Verificar logs do autoheal (restart automáticos)

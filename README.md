@@ -49,31 +49,44 @@ cd T3edSRO
 # 2. Executar provisionamento do host (instala Docker, UFW, fail2ban, unattended-upgrades)
 sudo bash scripts/setup.sh
 
-# 3. Copiar e editar variáveis de ambiente
+# 3. Baixar schemas SQL do rAthena (OBRIGATÓRIO — rede interna sem internet)
+#    Faça isso em uma máquina com acesso à internet e copie para o servidor:
+wget -O sql/main.sql https://raw.githubusercontent.com/rathena/rathena/master/sql-files/main.sql
+wget -O sql/logs.sql https://raw.githubusercontent.com/rathena/rathena/master/sql-files/logs.sql
+
+# 4. Copiar e editar variáveis de ambiente
 cp .env.example .env
 nano .env  # Ajustar: senhas do DB, IP público, PACKETVER, nome do servidor
+#    IMPORTANTE: Defina LOGIN_SERVER_IP=rathena-login e CHAR_SERVER_IP=rathena-char
+#    (NÃO use 127.0.0.1 — os servidores comunicam via rede Docker por nome de container)
 
-# 4. Subir todos os serviços
+# 5. Subir todos os serviços
 docker compose up -d
 
-# 5. Verificar healthchecks (aguarde ~3 minutos para compilação inicial)
+# 6. Verificar healthchecks (aguarde ~3 minutos para compilação inicial)
 docker compose ps
 # Todos os serviços devem mostrar status "healthy"
 
-# 6. Verificar logs de inicialização
+# 7. Verificar logs de inicialização
 docker compose logs login-server --tail 20
 docker compose logs char-server --tail 20
 docker compose logs map-server --tail 20
 
-# 7. Primeiro login de jogador
-# 7a. Acesse o FluxCP para criar uma conta: http://<IP-DO-SERVIDOR>/
-# 7b. Configure o cliente RO com:
+# 8. Executar o instalador do FluxCP (apenas no primeiro deploy)
+#    Acesse http://<IP-DO-SERVIDOR>/ e siga o instalador para criar as tabelas cp_*
+#    Após conclusão, o painel estará pronto para uso.
+
+# 9. Primeiro login de jogador
+# 9a. Acesse o FluxCP para criar uma conta: http://<IP-DO-SERVIDOR>/
+# 9b. Configure o cliente RO com:
 #     - IP do servidor: <IP-DO-SERVIDOR>
 #     - PACKETVER: mesmo valor definido no .env (padrão: 20211103)
-# 7c. Abra o cliente e faça login com a conta criada
+# 9c. Abra o cliente e faça login com a conta criada
 ```
 
 > **Nota:** O primeiro `docker compose up -d` pode levar 5-10 minutos pois o rAthena é compilado a partir do código-fonte dentro do container. Builds subsequentes utilizam cache do Docker.
+
+> **Nota sobre logs:** Avisos nos logs sobre arquivos de importação opcionais (`packet_conf.txt`, `inter_server.yml`, `atcommands.yml`, `groups.yml`, `barters.yml`) são esperados e seguros. Esses arquivos não são obrigatórios e não afetam o funcionamento do servidor.
 
 ### Troubleshooting do Primeiro Deploy
 
@@ -83,6 +96,9 @@ docker compose logs map-server --tail 20
 | Erro de conexão DB | `docker compose logs mariadb` | Aguardar inicialização completa do MariaDB |
 | Cliente não conecta | Verificar firewall: `sudo ufw status` | Confirmar portas 6900/6121/5121 abertas |
 | PACKETVER incompatível | Erro "packet version mismatch" no log | Ajustar PACKETVER no .env e rebuild: `docker compose build` |
+| Inter-server não conecta | Logs com "connection refused" entre login/char/map | Verificar `LOGIN_SERVER_IP=rathena-login` e `CHAR_SERVER_IP=rathena-char` no .env (não usar 127.0.0.1) |
+| FluxCP sem tabelas cp_* | Erro ao registrar conta no FluxCP | Executar o instalador do FluxCP em `http://<IP>/` no primeiro deploy |
+| Avisos sobre import files | Warnings sobre `packet_conf.txt`, `inter_server.yml`, etc. | Ignorar — são arquivos de importação opcionais e não afetam o servidor |
 
 ## Estrutura do Projeto
 
@@ -106,7 +122,8 @@ rathena-infra/
 │   ├── entrypoint-map.sh       # Entrypoint Map Server
 │   ├── mariadb-entrypoint-wrapper.sh  # Buffer pool dinâmico
 │   └── fluxcp/
-│       └── Dockerfile          # Build FluxCP
+│       ├── Dockerfile          # Build FluxCP
+│       └── docker-entrypoint.sh # Gera config/servers.php e config/import/application.php
 ├── monitoring/
 │   └── grafana/
 │       ├── provisioning/
@@ -126,11 +143,13 @@ rathena-infra/
 │   ├── restore.sh              # Restauração de backup
 │   └── backup/
 │       ├── backup.sh           # Script de backup diário
-│       └── crontab             # Agendamento (04:00 UTC)
+│       ├── crontab             # Referência de agendamento (não usado em runtime)
+│       └── entrypoint.sh       # Sleep loop scheduler (04:00 UTC)
 ├── sql/
 │   ├── 00-setup-users.sql      # Criação de usuários e permissões
-│   ├── main.sql                # Schema principal rAthena (do repo oficial)
-│   └── logs.sql                # Schema de logs rAthena (do repo oficial)
+│   ├── 00-init.sh              # Inicialização do banco (usa schemas locais)
+│   ├── main.sql                # Schema principal rAthena (pré-baixado antes do deploy)
+│   └── logs.sql                # Schema de logs rAthena (pré-baixado antes do deploy)
 ├── .github/
 │   └── workflows/
 │       ├── validate.yml        # PR: lint + build test + trivy
@@ -292,11 +311,13 @@ docker compose logs --tail 50 login-server char-server map-server | grep -i "err
 | Verificação | Comando | Resultado Esperado |
 |-------------|---------|-------------------|
 | Healthchecks | `docker compose ps` | Todos "healthy" |
-| Conexão TCP Login | `nc -z localhost 6900` | Sucesso |
-| Conexão TCP Char | `nc -z localhost 6121` | Sucesso |
-| Conexão TCP Map | `nc -z localhost 5121` | Sucesso |
+| Login Server rodando | `docker compose exec login-server pidof login-server` | PID retornado |
+| Char Server rodando | `docker compose exec char-server pidof char-server` | PID retornado |
+| Map Server rodando | `docker compose exec map-server pidof map-server` | PID retornado |
 | Logs sem erros | `docker compose logs --tail 20 \| grep -i error` | Nenhum erro crítico |
 | Login de jogador | Testar no cliente RO | Login bem-sucedido |
+
+> **Nota:** Avisos nos logs sobre `packet_conf.txt`, `inter_server.yml`, `atcommands.yml`, `groups.yml` e `barters.yml` são esperados e seguros — são arquivos de importação opcionais.
 
 ### Rollback em Caso de Falha
 

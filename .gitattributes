@@ -1,0 +1,9 @@
+# Force LF line endings for shell scripts (critical for Docker bind mounts on Windows)
+*.sh text eol=lf
+*.tmpl text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.cnf text eol=lf
+*.sql text eol=lf
+Dockerfile text eol=lf
+docker-compose.yml text eol=lf

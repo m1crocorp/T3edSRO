@@ -52,9 +52,10 @@ services:
   # MariaDB 11.4 LTS - Database Server
   # --------------------------------------------------------
   mariadb:
-    image: mariadb:11.4
+    build:
+      context: ./docker/mariadb
+      dockerfile: Dockerfile
     container_name: rathena-mariadb
-    entrypoint: ["bash", "/usr/local/bin/mariadb-entrypoint-wrapper.sh"]
     environment:
       MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
       RATHENA_DB_USER: ${RATHENA_DB_USER}
@@ -72,7 +73,6 @@ services:
       - rathena-db-data:/var/lib/mysql
       - ./sql:/docker-entrypoint-initdb.d:ro
       - ./db/conf.d:/etc/mysql/conf.d:ro
-      - ./docker/mariadb-entrypoint-wrapper.sh:/usr/local/bin/mariadb-entrypoint-wrapper.sh:ro
     networks:
       - rathena-internal
     healthcheck:
